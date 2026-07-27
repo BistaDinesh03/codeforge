@@ -24,8 +24,38 @@
       {
         "command": "codeforge.disconnect",
         "title": "CodeForge: Disconnect from Android"
+      },
+      {
+        "command": "codeforge.explainCode",
+        "title": "CodeForge: Explain Code"
+      },
+      {
+        "command": "codeforge.generateCode",
+        "title": "CodeForge: Generate Code"
+      },
+      {
+        "command": "codeforge.rewriteCode",
+        "title": "CodeForge: Rewrite Code"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeforge.explainCode",
+          "when": "editorHasSelection",
+          "group": "codeforge"
+        },
+        {
+          "command": "codeforge.generateCode",
+          "group": "codeforge"
+        },
+        {
+          "command": "codeforge.rewriteCode",
+          "when": "editorHasSelection",
+          "group": "codeforge"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",
