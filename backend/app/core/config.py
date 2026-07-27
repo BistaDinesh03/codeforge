@@ -1,41 +1,72 @@
 """
-Application configuration.
-Reads settings from environment variables with sensible defaults.
+Application configuration using Pydantic Settings.
+Reads from environment variables and .env file.
 """
 
 import os
 from pathlib import Path
+from typing import Literal
+from pydantic_settings import BaseSettings
 
 
-class Settings:
+class Settings(BaseSettings):
     """Central configuration for CodeForge backend."""
 
-    # Application
+    # ── Application ──
     APP_NAME: str = "CodeForge Backend"
     APP_VERSION: str = "0.0.1"
-    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    ENVIRONMENT: Literal["development", "staging", "production"] = "development"
+    DEBUG: bool = False
 
-    # Server
-    HOST: str = os.getenv("HOST", "127.0.0.1")
-    PORT: int = int(os.getenv("PORT", "8000"))
+    # ── Server ──
+    HOST: str = "127.0.0.1"
+    PORT: int = 8000
+    WORKERS: int = 1
 
-    # Paths
+    # ── Paths ──
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     MODELS_DIR: Path = BASE_DIR / "models"
     LOGS_DIR: Path = BASE_DIR / "logs"
+    DATA_DIR: Path = BASE_DIR / "data"
 
-    # Model settings
-    DEFAULT_MODEL: str = os.getenv("DEFAULT_MODEL", "codellama-7b")
-    MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "2048"))
-    TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.7"))
+    # ── Model Settings ──
+    DEFAULT_MODEL: str = "codellama-7b.Q4_K_M.gguf"
+    MODEL_PATH: Path | None = None
+    MAX_TOKENS: int = 2048
+    TEMPERATURE: float = 0.7
+    TOP_P: float = 0.95
+    CONTEXT_LENGTH: int = 4096
 
-    # Security (future use)
-    API_KEY: str | None = os.getenv("API_KEY", None)
+    # ── Logging ──
+    LOG_LEVEL: str = "INFO"
+
+    # ── Security ──
+    API_KEY: str | None = None
+    ALLOWED_ORIGINS: list[str] = ["*"]
+
+    # ── Performance ──
+    REQUEST_TIMEOUT: int = 60
+    MAX_CONCURRENT_REQUESTS: int = 4
 
     class Config:
         """Pydantic config."""
+        env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
 
+    def model_dump_safe(self) -> dict:
+        """Return config as dict, hiding sensitive values."""
+        data = self.model_dump()
+        # Hide sensitive values
+        if "API_KEY" in data and data["API_KEY"]:
+            data["API_KEY"] = "***REDACTED***"
+        return data
 
-# Create a global settings instance
+
+# Global settings instance
 settings = Settings()
+
+# Create required directories
+settings.MODELS_DIR.mkdir(parents=True, exist_ok=True)
+settings.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+settings.DATA_DIR.mkdir(parents=True, exist_ok=True)

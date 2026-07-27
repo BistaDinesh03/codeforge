@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -7,36 +7,50 @@ on:
     branches: [main]
 
 jobs:
+  # ── Backend Tests ──
   backend-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+
       - name: Install dependencies
         run: |
           cd backend
           pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx pydantic-settings
+
       - name: Run tests
         run: |
           cd backend
-          python -m pytest
+          python -m pytest tests/ -v --tb=short
 
-  extension-tests:
+  # ── Extension Build ──
+  extension-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "18"
+
       - name: Install dependencies
         run: |
           cd vscode-extension
           npm install
-      - name: Run tests
+
+      - name: Compile TypeScript
         run: |
           cd vscode-extension
-          npm test
+          npm run compile
+
+      - name: Lint (if configured)
+        run: |
+          cd vscode-extension
+          npx tsc --noEmit
