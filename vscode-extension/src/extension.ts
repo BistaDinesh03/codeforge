@@ -1,45 +1,78 @@
 import * as vscode from "vscode";
 import * as http from "http";
+import { AdbManager } from "./adbManager";
+
+let adbManager: AdbManager;
 
 /**
  * Activates the CodeForge extension.
- * Registers the command to open the chat panel.
  */
 export function activate(context: vscode.ExtensionContext) {
   console.log("CodeForge extension activated");
 
-  const startCommand = vscode.commands.registerCommand(
-    "codeforge.start",
-    () => {
-      ChatPanel.createOrShow(context.extensionUri);
+  adbManager = new AdbManager();
+
+  // Register: Connect to Android
+  const connectCommand = vscode.commands.registerCommand(
+    "codeforge.connect",
+    async () => {
+      const connected = await adbManager.connect();
+      if (connected) {
+        vscode.window.showInformationMessage(
+          "CodeForge: Ready! Open chat panel to start."
+        );
+      }
     }
   );
 
-  context.subscriptions.push(startCommand);
+  // Register: Open Chat Panel
+  const chatCommand = vscode.commands.registerCommand(
+    "codeforge.start",
+    () => {
+      ChatPanel.createOrShow(context.extensionUri, adbManager);
+    }
+  );
+
+  // Register: Disconnect
+  const disconnectCommand = vscode.commands.registerCommand(
+    "codeforge.disconnect",
+    async () => {
+      await adbManager.disconnect();
+    }
+  );
+
+  context.subscriptions.push(connectCommand, chatCommand, disconnectCommand);
 }
 
 /**
- * Deactivates the extension and cleans up resources.
+ * Deactivates the extension and cleans up.
  */
-export function deactivate() {
+export async function deactivate() {
+  if (adbManager) {
+    await adbManager.disconnect();
+  }
   console.log("CodeForge extension deactivated");
 }
 
 /**
  * Manages the chat panel webview.
- * Handles all communication between VS Code and the webview UI.
  */
 class ChatPanel {
   private static currentPanel: ChatPanel | undefined;
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
+  private _adbManager: AdbManager;
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+  private constructor(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    adbManager: AdbManager
+  ) {
     this._panel = panel;
+    this._adbManager = adbManager;
     this._panel.webview.html = this._getHtml(extensionUri);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-    // Handle messages from the webview
     this._panel.webview.onDidReceiveMessage(
       (message) => this._handleMessage(message),
       null,
@@ -47,10 +80,10 @@ class ChatPanel {
     );
   }
 
-  /**
-   * Creates a new chat panel or reveals the existing one.
-   */
-  public static createOrShow(extensionUri: vscode.Uri) {
+  public static createOrShow(
+    extensionUri: vscode.Uri,
+    adbManager: AdbManager
+  ) {
     const column = vscode.ViewColumn.Two;
 
     if (ChatPanel.currentPanel) {
@@ -68,47 +101,45 @@ class ChatPanel {
       }
     );
 
-    ChatPanel.currentPanel = new ChatPanel(panel, extensionUri);
+    ChatPanel.currentPanel = new ChatPanel(panel, extensionUri, adbManager);
   }
 
-  /**
-   * Handles messages sent from the webview.
-   * User typed a message -> send to backend -> stream response back.
-   */
   private async _handleMessage(message: { command: string; text?: string }) {
     switch (message.command) {
       case "sendMessage":
         if (!message.text) return;
+        
+        // Check connection before sending
+        const isReachable = await this._adbManager.isBackendReachable();
+        if (!isReachable) {
+          this._panel.webview.postMessage({
+            command: "responseError",
+            error: "Not connected to CodeForge server. Run 'CodeForge: Connect to Android' first.",
+          });
+          return;
+        }
+        
         await this._streamResponse(message.text);
         break;
     }
   }
 
-  /**
-   * Sends user message to FastAPI backend and streams the response.
-   */
   private async _streamResponse(userMessage: string) {
     const backendUrl = "http://127.0.0.1:8000/chat";
 
     try {
-      // Tell the webview we're loading
-      this._panel.webview.postMessage({
-        command: "responseStart",
-      });
+      this._panel.webview.postMessage({ command: "responseStart" });
 
       const response = await this._httpPost(backendUrl, {
         message: userMessage,
       });
 
-      // Send the response back to the webview
       this._panel.webview.postMessage({
         command: "responseChunk",
         text: response,
       });
 
-      this._panel.webview.postMessage({
-        command: "responseDone",
-      });
+      this._panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
       this._panel.webview.postMessage({
         command: "responseError",
@@ -120,10 +151,6 @@ class ChatPanel {
     }
   }
 
-  /**
-   * Simple HTTP POST helper.
-   * Sends JSON to the backend and returns the response body.
-   */
   private _httpPost(url: string, data: object): Promise<string> {
     return new Promise((resolve, reject) => {
       const postData = JSON.stringify(data);
@@ -138,7 +165,7 @@ class ChatPanel {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(postData),
         },
-        timeout: 30000, // 30 second timeout
+        timeout: 30000,
       };
 
       const req = http.request(options, (res) => {
@@ -170,9 +197,6 @@ class ChatPanel {
     });
   }
 
-  /**
-   * Generates the HTML for the chat panel.
-   */
   private _getHtml(extensionUri: vscode.Uri): string {
     return `<!DOCTYPE html>
 <html lang="en">
@@ -217,6 +241,21 @@ class ChatPanel {
             border: 1px solid var(--vscode-inputValidation-errorBorder);
             color: var(--vscode-inputValidation-errorForeground);
         }
+        .status-bar {
+            padding: 4px 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-align: center;
+        }
+        .status-connected {
+            background: var(--vscode-terminal-ansiGreen);
+            color: white;
+        }
+        .status-disconnected {
+            background: var(--vscode-inputValidation-errorBackground);
+            color: var(--vscode-inputValidation-errorForeground);
+        }
         #inputContainer {
             display: flex;
             gap: 8px;
@@ -230,9 +269,6 @@ class ChatPanel {
             border-radius: 4px;
             font-family: inherit;
             resize: none;
-        }
-        #messageInput:focus {
-            outline: 1px solid var(--vscode-focusBorder);
         }
         #sendButton {
             padding: 8px 16px;
@@ -249,17 +285,13 @@ class ChatPanel {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        .loading {
-            color: var(--vscode-descriptionForeground);
-            font-style: italic;
-            padding: 8px 12px;
-        }
     </style>
 </head>
 <body>
+    <div id="statusBar" class="status-bar status-disconnected">Disconnected</div>
     <div id="chatContainer"></div>
     <div id="inputContainer">
-        <textarea id="messageInput" rows="2" placeholder="Ask CodeForge..."></textarea>
+        <textarea id="messageInput" rows="2" placeholder="Connect first: Ctrl+Shift+P → CodeForge: Connect to Android"></textarea>
         <button id="sendButton">Send</button>
     </div>
     <script>
@@ -267,12 +299,10 @@ class ChatPanel {
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        const statusBar = document.getElementById('statusBar');
         let currentAiMessage = null;
 
-        // Send message on button click
         sendButton.addEventListener('click', sendMessage);
-
-        // Send message on Enter (Shift+Enter for new line)
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -284,16 +314,13 @@ class ChatPanel {
             const text = messageInput.value.trim();
             if (!text) return;
 
-            // Add user message to chat
             addMessage(text, 'user-message');
             messageInput.value = '';
             sendButton.disabled = true;
 
-            // Send to extension
             vscode.postMessage({ command: 'sendMessage', text: text });
         }
 
-        // Handle messages from extension
         window.addEventListener('message', (event) => {
             const message = event.data;
 
@@ -301,24 +328,32 @@ class ChatPanel {
                 case 'responseStart':
                     currentAiMessage = addMessage('', 'ai-message');
                     break;
-
                 case 'responseChunk':
                     if (currentAiMessage) {
                         currentAiMessage.textContent += message.text;
                         chatContainer.scrollTop = chatContainer.scrollHeight;
                     }
                     break;
-
                 case 'responseDone':
                     sendButton.disabled = false;
                     messageInput.focus();
                     currentAiMessage = null;
                     break;
-
                 case 'responseError':
                     addMessage('❌ ' + message.error, 'error-message');
                     sendButton.disabled = false;
                     currentAiMessage = null;
+                    break;
+                case 'connectionStatus':
+                    if (message.connected) {
+                        statusBar.textContent = '🟢 Connected to Android';
+                        statusBar.className = 'status-bar status-connected';
+                        messageInput.placeholder = 'Ask CodeForge...';
+                    } else {
+                        statusBar.textContent = '🔴 Disconnected';
+                        statusBar.className = 'status-bar status-disconnected';
+                        messageInput.placeholder = 'Connect first: Ctrl+Shift+P → CodeForge: Connect to Android';
+                    }
                     break;
             }
         });
@@ -336,9 +371,6 @@ class ChatPanel {
 </html>`;
   }
 
-  /**
-   * Clean up resources when the panel is closed.
-   */
   private dispose() {
     ChatPanel.currentPanel = undefined;
     this._panel.dispose();

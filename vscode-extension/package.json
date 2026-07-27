@@ -14,8 +14,16 @@
   "contributes": {
     "commands": [
       {
+        "command": "codeforge.connect",
+        "title": "CodeForge: Connect to Android"
+      },
+      {
         "command": "codeforge.start",
-        "title": "CodeForge: Start Server"
+        "title": "CodeForge: Open Chat"
+      },
+      {
+        "command": "codeforge.disconnect",
+        "title": "CodeForge: Disconnect from Android"
       }
     ]
   },
