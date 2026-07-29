@@ -63,6 +63,9 @@ class BM25Search:
 
             total_length += len(tokens)
 
+            # Free memory after indexing
+            file.unload_content()
+
             for token, count in token_counts.items():
                 if token not in self.inverted_index:
                     self.inverted_index[token] = {}
@@ -151,7 +154,7 @@ def get_search_engine(project_path: str, force_rebuild: bool = False) -> BM25Sea
     if not force_rebuild and cache_key in _index_cache:
         return _index_cache[cache_key]
 
-    files = scan_project(project_path)
+    files = scan_project(project_path, load_content=True)
     bm25 = BM25Search()
     bm25.build_index(files, source_path=cache_key)
     _index_cache[cache_key] = bm25

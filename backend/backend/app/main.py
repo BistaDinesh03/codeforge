@@ -15,9 +15,6 @@ from app.middleware.auth import ApiKeyMiddleware
 setup_logging(log_level=settings.LOG_LEVEL)
 logger = get_logger(__name__)
 
-logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-logger.info(f"Environment: {settings.ENVIRONMENT}")
-
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI coding server running on Android via Termux",
@@ -39,20 +36,34 @@ app.include_router(diagnostics_router, tags=["diagnostics"])
 
 
 class ChatRequest(BaseModel):
+    """Chat request with input validation."""
     message: str = Field(
         ...,
         min_length=1,
         max_length=settings.MAX_REQUEST_SIZE,
-        description="The user's message"
+        description="The user's message (1-100000 characters)"
     )
 
 
 class ChatResponse(BaseModel):
+    """Chat response."""
     response: str
 
 
-@app.get("/")
+class ErrorResponse(BaseModel):
+    """Standard error response."""
+    detail: str
+    error_code: str | None = None
+
+
+@app.get(
+    "/",
+    responses={
+        200: {"description": "Server information"},
+    }
+)
 async def root():
+    """Root endpoint returning server metadata."""
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
@@ -62,8 +73,18 @@ async def root():
     }
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post(
+    "/chat",
+    response_model=ChatResponse,
+    responses={
+        200: {"description": "Successful chat response"},
+        400: {"description": "Empty message", "model": ErrorResponse},
+        401: {"description": "Invalid or missing API key", "model": ErrorResponse},
+        422: {"description": "Validation error - message too long or missing", "model": ErrorResponse},
+    },
+)
 async def chat(request: ChatRequest):
+    """Send a message to the AI and get a response."""
     safe_message = request.message.replace("\n", " ").replace("\r", " ")[:100]
     logger.info(f"Chat request: {safe_message}")
 
@@ -71,7 +92,6 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     response_text = f"[{settings.ENVIRONMENT}] You said: {request.message}"
-    logger.debug(f"Response: {len(response_text)} chars")
     return ChatResponse(response=response_text)
 
 
@@ -80,7 +100,6 @@ async def startup_event():
     auth_status = "enabled" if settings.API_KEY else "disabled"
     logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
     logger.info(f"Authentication: {auth_status}")
-    logger.info(f"API docs: http://{settings.HOST}:{settings.PORT}/docs")
 
 
 @app.on_event("shutdown")
