@@ -159,7 +159,7 @@ class ChatPanel {
   private async sendChatMessage(userMessage: string) {
     try {
       this._panel.webview.postMessage({ command: "responseStart" });
-      const response = await (this._apiClient as any).sendChat(userMessage);
+      const response = await this._apiClient.sendChat(userMessage);
       this._panel.webview.postMessage({ command: "responseChunk", text: response });
       this._panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
@@ -171,10 +171,11 @@ class ChatPanel {
   }
 
   private getHtml(): string {
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <style>
         body { font-family: sans-serif; padding: 12px; margin: 0; background: #1e1e1e; color: #d4d4d4; }
         #chatContainer { height: calc(100vh - 120px); overflow-y: auto; margin-bottom: 8px; }
@@ -257,7 +258,6 @@ class ChatPanel {
     </script>
 </body>
 </html>`;
-    return html;
   }
 
   private dispose() {

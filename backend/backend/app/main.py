@@ -3,13 +3,14 @@ Main FastAPI application for CodeForge backend.
 Production-ready with logging, diagnostics, and configuration.
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
 from app.api.diagnostics import router as diagnostics_router
+from app.middleware.auth import ApiKeyMiddleware
 
 # Setup logging first
 setup_logging(log_level=settings.LOG_LEVEL)
@@ -24,6 +25,9 @@ app = FastAPI(
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
 )
+
+# Auth middleware (only active when API_KEY is set)
+app.add_middleware(ApiKeyMiddleware)
 
 # CORS middleware with environment-aware settings
 app.add_middleware(
@@ -68,27 +72,22 @@ async def root():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Chat endpoint with validated input and sanitized logging."""
-    # Sanitize message for logging (prevent log injection)
     safe_message = request.message.replace("\n", " ").replace("\r", " ")[:100]
     logger.info(f"Chat request: {safe_message}")
 
-    # Pydantic already validates min_length and max_length
-    # Extra check for whitespace-only strings
     if not request.message.strip():
-        logger.warning("Whitespace-only message rejected")
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # Placeholder response (will be replaced with AI model)
     response_text = f"[{settings.ENVIRONMENT}] You said: {request.message}"
-
     logger.debug(f"Response generated: {len(response_text)} chars")
     return ChatResponse(response=response_text)
 
 
 @app.on_event("startup")
 async def startup_event():
+    auth_status = "enabled" if settings.API_KEY else "disabled"
     logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info(f"Authentication: {auth_status}")
     logger.info(f"API docs: http://{settings.HOST}:{settings.PORT}/docs")
 
 

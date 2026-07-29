@@ -40,9 +40,18 @@ class Settings(BaseSettings):
     # ── Logging ──
     LOG_LEVEL: str = "INFO"
 
+    # ── CORS ──
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+    ALLOW_CREDENTIALS: bool = False
+
     # ── Security ──
     API_KEY: str | None = None
-    ALLOWED_ORIGINS: list[str] = ["*"]
+    MAX_REQUEST_SIZE: int = 100000
+    RATE_LIMIT_REQUESTS: int = 30
+    RATE_LIMIT_WINDOW: int = 60
 
     # ── Performance ──
     REQUEST_TIMEOUT: int = 60
@@ -57,10 +66,23 @@ class Settings(BaseSettings):
     def model_dump_safe(self) -> dict:
         """Return config as dict, hiding sensitive values."""
         data = self.model_dump()
-        # Hide sensitive values
         if "API_KEY" in data and data["API_KEY"]:
             data["API_KEY"] = "***REDACTED***"
         return data
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Get appropriate CORS origins for current environment."""
+        if self.ENVIRONMENT == "development":
+            return ["*"]
+        return self.ALLOWED_ORIGINS
+
+    @property
+    def cors_credentials(self) -> bool:
+        """Credentials only with explicit origins, never with wildcard."""
+        if self.ENVIRONMENT == "development":
+            return False
+        return self.ALLOW_CREDENTIALS
 
 
 # Global settings instance

@@ -1,8 +1,6 @@
-import * as http from "http";
-
 /**
  * Client for communicating with the CodeForge backend.
- * Sends code operations and receives AI responses.
+ * Uses modern fetch API with AbortController for cancellation.
  */
 export class ApiClient {
   private baseUrl: string;
@@ -14,40 +12,70 @@ export class ApiClient {
   }
 
   /**
-   * Sends code to backend for explanation.
+   * Explains code in plain English.
    */
-  async explainCode(code: string, language: string): Promise<string> {
+  async explainCode(code: string, language: string, signal?: AbortSignal): Promise<string> {
     const prompt = `Explain the following ${language} code in simple terms:\n\n\`\`\`${language}\n${code}\n\`\`\``;
-    
-    const response = await this.sendChat(prompt);
-    return response;
+    return this.sendChat(prompt, signal);
   }
 
   /**
-   * Sends a description to generate code.
+   * Generates code from a description.
    */
-  async generateCode(description: string, language: string): Promise<string> {
+  async generateCode(description: string, language: string, signal?: AbortSignal): Promise<string> {
     const prompt = `Generate ${language} code for the following:\n\n${description}\n\nReturn only the code, no explanation.`;
-    
-    const response = await this.sendChat(prompt);
+    const response = await this.sendChat(prompt, signal);
     return this.extractCodeBlock(response, language);
   }
 
   /**
-   * Sends code to be rewritten/improved.
+   * Rewrites code to be cleaner and more efficient.
    */
-  async rewriteCode(code: string, language: string): Promise<string> {
+  async rewriteCode(code: string, language: string, signal?: AbortSignal): Promise<string> {
     const prompt = `Rewrite the following ${language} code to be cleaner, more efficient, and follow best practices. Return only the improved code:\n\n\`\`\`${language}\n${code}\n\`\`\``;
-    
-    const response = await this.sendChat(prompt);
+    const response = await this.sendChat(prompt, signal);
     return this.extractCodeBlock(response, language);
   }
 
   /**
    * Sends a chat message to the backend.
    */
-  private sendChat(message: string): Promise<string> {
-    return this.httpPost("/chat", { message });
+  async sendChat(message: string, signal?: AbortSignal): Promise<string> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    // Merge external signal with our timeout
+    if (signal) {
+      signal.addEventListener("abort", () => controller.abort());
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Backend error ${response.status}: ${errorBody}`);
+      }
+
+      
+      const data = await response.json() as { response?: string };
+      return data.response || "";
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("Request timed out or was cancelled");
+      }
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        throw new Error("Cannot reach backend. Is the phone server running?");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   /**
@@ -55,9 +83,18 @@ export class ApiClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.httpGet("/health");
-      const data = JSON.parse(response);
-      return data.status === "healthy";
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${this.baseUrl}/health/simple`, {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) return false;
+      const data = await response.json() as { status?: string };
+      return data.status === "ok";
     } catch {
       return false;
     }
@@ -67,7 +104,6 @@ export class ApiClient {
    * Extracts code from markdown code blocks in AI response.
    */
   private extractCodeBlock(text: string, language: string): string {
-    // Try to extract code between ``` blocks
     const codeBlockRegex = new RegExp(
       `\`\`\`(?:${language})?\\s*\\n?([\\s\\S]*?)\`\`\``,
       "i"
@@ -78,98 +114,6 @@ export class ApiClient {
       return match[1].trim();
     }
 
-    // If no code block found, return the whole response
     return text.trim();
-  }
-
-  /**
-   * HTTP GET request.
-   */
-  private httpGet(path: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const url = new URL(path, this.baseUrl);
-
-      const options: http.RequestOptions = {
-        hostname: url.hostname,
-        port: url.port,
-        path: url.pathname,
-        method: "GET",
-        timeout: this.timeout,
-      };
-
-      const req = http.request(options, (res) => {
-        let body = "";
-        res.on("data", (chunk: Buffer) => {
-          body += chunk.toString();
-        });
-        res.on("end", () => {
-          if (res.statusCode === 200) {
-            resolve(body);
-          } else {
-            reject(new Error(`HTTP ${res.statusCode}`));
-          }
-        });
-      });
-
-      req.on("error", reject);
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("Request timed out"));
-      });
-      req.end();
-    });
-  }
-
-  /**
-   * HTTP POST request with JSON body.
-   */
-  private httpPost(path: string, data: object): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const postData = JSON.stringify(data);
-      const url = new URL(path, this.baseUrl);
-
-      const options: http.RequestOptions = {
-        hostname: url.hostname,
-        port: url.port,
-        path: url.pathname,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(postData),
-        },
-        timeout: this.timeout,
-      };
-
-      const req = http.request(options, (res) => {
-        let body = "";
-        res.on("data", (chunk: Buffer) => {
-          body += chunk.toString();
-        });
-        res.on("end", () => {
-          if (res.statusCode === 200) {
-            try {
-              const parsed = JSON.parse(body);
-              resolve(parsed.response || body);
-            } catch {
-              resolve(body);
-            }
-          } else {
-            reject(new Error(`Backend returned status ${res.statusCode}`));
-          }
-        });
-      });
-
-      req.on("error", (error) => {
-        reject(new Error(`Cannot reach backend: ${error.message}`));
-      });
-
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("Request timed out — is the phone server running?"));
-      });
-
-      req.write(postData);
-      req.end();
-    });
   }
 }
