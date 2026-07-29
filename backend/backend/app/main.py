@@ -12,7 +12,6 @@ from app.core.logging_config import setup_logging, get_logger
 from app.api.diagnostics import router as diagnostics_router
 from app.middleware.auth import ApiKeyMiddleware
 
-# Setup logging first
 setup_logging(log_level=settings.LOG_LEVEL)
 logger = get_logger(__name__)
 
@@ -26,10 +25,8 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
-# Auth middleware (only active when API_KEY is set)
 app.add_middleware(ApiKeyMiddleware)
 
-# CORS middleware with environment-aware settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -38,12 +35,10 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
-# Include routers
 app.include_router(diagnostics_router, tags=["diagnostics"])
 
 
 class ChatRequest(BaseModel):
-    """Chat request with input validation."""
     message: str = Field(
         ...,
         min_length=1,
@@ -53,13 +48,11 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Chat response."""
     response: str
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
@@ -71,7 +64,6 @@ async def root():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Chat endpoint with validated input and sanitized logging."""
     safe_message = request.message.replace("\n", " ").replace("\r", " ")[:100]
     logger.info(f"Chat request: {safe_message}")
 
@@ -79,7 +71,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     response_text = f"[{settings.ENVIRONMENT}] You said: {request.message}"
-    logger.debug(f"Response generated: {len(response_text)} chars")
+    logger.debug(f"Response: {len(response_text)} chars")
     return ChatResponse(response=response_text)
 
 

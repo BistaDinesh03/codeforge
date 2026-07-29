@@ -15,10 +15,13 @@ export function activate(context: vscode.ExtensionContext) {
   const connectCommand = vscode.commands.registerCommand(
     "codeforge.connect",
     async () => {
-      const connected = await adbManager.connect();
-      if (connected) {
-        vscode.window.showInformationMessage("CodeForge: Ready! Connected to Android AI server.");
+      const result = await adbManager.connect();
+      if (!result.success) {
+        return;
       }
+      vscode.window.showInformationMessage(
+        `CodeForge: Connected to ${result.deviceId || "Android device"}`
+      );
     }
   );
 

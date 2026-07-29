@@ -1,14 +1,40 @@
 /**
+ * Backend configuration interface.
+ */
+export interface BackendConfig {
+  baseUrl: string;
+  timeout: number;
+  retries: number;
+  retryDelay: number;
+}
+
+/**
+ * Default backend configuration.
+ */
+export const DEFAULT_BACKEND_CONFIG: BackendConfig = {
+  baseUrl: "http://127.0.0.1:8000",
+  timeout: 30000,
+  retries: 3,
+  retryDelay: 1000,
+};
+
+/**
  * Client for communicating with the CodeForge backend.
- * Uses modern fetch API with AbortController for cancellation.
+ * Uses fetch with AbortController and retry logic.
  */
 export class ApiClient {
-  private baseUrl: string;
-  private timeout: number;
+  private config: BackendConfig;
 
-  constructor(baseUrl: string = "http://127.0.0.1:8000", timeout: number = 30000) {
-    this.baseUrl = baseUrl;
-    this.timeout = timeout;
+  constructor(config: Partial<BackendConfig> = {}) {
+    this.config = { ...DEFAULT_BACKEND_CONFIG, ...config };
+  }
+
+  updateConfig(config: Partial<BackendConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+
+  get baseUrl(): string {
+    return this.config.baseUrl;
   }
 
   /**
@@ -38,19 +64,56 @@ export class ApiClient {
   }
 
   /**
-   * Sends a chat message to the backend.
+   * Sends a chat message with retry logic.
    */
   async sendChat(message: string, signal?: AbortSignal): Promise<string> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    let lastError: Error | null = null;
 
-    // Merge external signal with our timeout
+    for (let attempt = 0; attempt <= this.config.retries; attempt++) {
+      try {
+        return await this._sendChatRequest(message, signal);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Don't retry on client errors (4xx)
+        if (lastError.message.includes("Backend error 4")) {
+          throw lastError;
+        }
+
+        // Don't retry if cancelled
+        if (signal?.aborted) {
+          throw lastError;
+        }
+
+        // Last attempt — give up
+        if (attempt === this.config.retries) {
+          throw new Error(
+            `Failed after ${this.config.retries + 1} attempts: ${lastError.message}`
+          );
+        }
+
+        // Wait with exponential backoff before retry
+        const delay = this.config.retryDelay * Math.pow(2, attempt);
+        await this._sleep(delay);
+      }
+    }
+
+    throw lastError || new Error("Unknown error");
+  }
+
+  /**
+   * Single chat request (no retry).
+   */
+  private async _sendChatRequest(message: string, signal?: AbortSignal): Promise<string> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
     if (signal) {
       signal.addEventListener("abort", () => controller.abort());
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/chat`, {
+      const response = await fetch(`${this.config.baseUrl}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
@@ -62,17 +125,8 @@ export class ApiClient {
         throw new Error(`Backend error ${response.status}: ${errorBody}`);
       }
 
-      
       const data = await response.json() as { response?: string };
       return data.response || "";
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new Error("Request timed out or was cancelled");
-      }
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        throw new Error("Cannot reach backend. Is the phone server running?");
-      }
-      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -86,7 +140,7 @@ export class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${this.baseUrl}/health/simple`, {
+      const response = await fetch(`${this.config.baseUrl}/health/simple`, {
         signal: controller.signal,
       });
 
@@ -101,7 +155,7 @@ export class ApiClient {
   }
 
   /**
-   * Extracts code from markdown code blocks in AI response.
+   * Extracts code from markdown code blocks.
    */
   private extractCodeBlock(text: string, language: string): string {
     const codeBlockRegex = new RegExp(
@@ -115,5 +169,12 @@ export class ApiClient {
     }
 
     return text.trim();
+  }
+
+  /**
+   * Sleep for a given number of milliseconds.
+   */
+  private _sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
