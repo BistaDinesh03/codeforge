@@ -4,55 +4,27 @@ Knows which folders and files to ignore.
 """
 
 import os
+import asyncio
 from pathlib import Path
 from typing import Generator
 
-# Folders and files to ignore during scanning
 IGNORED_DIRS: set[str] = {
-    "node_modules",
-    ".git",
-    ".svn",
-    ".hg",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".tox",
-    "venv",
-    ".venv",
-    "env",
-    ".env",
-    "dist",
-    "build",
-    ".next",
-    ".nuxt",
-    "target",  # Rust
-    "vendor",  # Go/PHP
-    ".idea",
-    ".vscode",
-    "logs",
-    "models",  # AI model files (huge)
+    "node_modules", ".git", ".svn", ".hg", "__pycache__",
+    ".pytest_cache", ".mypy_cache", ".tox", "venv", ".venv",
+    "env", ".env", "dist", "build", ".next", ".nuxt",
+    "target", "vendor", ".idea", ".vscode", "logs", "models",
 }
 
 IGNORED_FILES: set[str] = {
-    ".DS_Store",
-    "Thumbs.db",
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-    "poetry.lock",
-    "Pipfile.lock",
+    ".DS_Store", "Thumbs.db", "package-lock.json", "yarn.lock",
+    "pnpm-lock.yaml", "poetry.lock", "Pipfile.lock",
 }
 
-# File extensions we care about
 CODE_EXTENSIONS: set[str] = {
-    ".py", ".js", ".ts", ".tsx", ".jsx",
-    ".java", ".kt", ".swift",
-    ".c", ".cpp", ".h", ".hpp",
-    ".rs", ".go", ".rb", ".php",
-    ".html", ".css", ".scss",
-    ".json", ".yaml", ".yml", ".toml",
-    ".md", ".txt", ".sh", ".bash",
-    ".sql", ".graphql", ".proto",
+    ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".kt", ".swift",
+    ".c", ".cpp", ".h", ".hpp", ".rs", ".go", ".rb", ".php",
+    ".html", ".css", ".scss", ".json", ".yaml", ".yml", ".toml",
+    ".md", ".txt", ".sh", ".bash", ".sql", ".graphql", ".proto",
 }
 
 
@@ -72,22 +44,15 @@ class ProjectFile:
 def scan_project(root_path: str | Path) -> list[ProjectFile]:
     """
     Scans a project directory and returns all relevant code files.
-
-    Args:
-        root_path: Path to the project root directory.
-
-    Returns:
-        List of ProjectFile objects.
+    Synchronous version.
     """
     root = Path(root_path).resolve()
     files: list[ProjectFile] = []
 
     for dirpath, dirnames, filenames in os.walk(root):
-        # Remove ignored directories from the walk
         dirnames[:] = [
             d for d in dirnames
-            if d not in IGNORED_DIRS
-            and not d.startswith(".")
+            if d not in IGNORED_DIRS and not d.startswith(".")
         ]
 
         current_dir = Path(dirpath)
@@ -95,22 +60,17 @@ def scan_project(root_path: str | Path) -> list[ProjectFile]:
         for filename in filenames:
             file_path = current_dir / filename
 
-            # Skip ignored files
             if filename in IGNORED_FILES:
                 continue
-
-            # Skip files without recognized extensions
             if file_path.suffix.lower() not in CODE_EXTENSIONS:
                 continue
 
-            # Skip very large files (> 1MB)
             try:
                 if file_path.stat().st_size > 1_000_000:
                     continue
             except OSError:
                 continue
 
-            # Try to read the file
             try:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
                 relative_path = str(file_path.relative_to(root))
@@ -119,6 +79,14 @@ def scan_project(root_path: str | Path) -> list[ProjectFile]:
                 continue
 
     return files
+
+
+async def scan_project_async(root_path: str | Path) -> list[ProjectFile]:
+    """
+    Scans a project directory asynchronously.
+    Runs the synchronous scan in a thread pool to avoid blocking.
+    """
+    return await asyncio.to_thread(scan_project, root_path)
 
 
 def get_file_count(root_path: str | Path) -> int:

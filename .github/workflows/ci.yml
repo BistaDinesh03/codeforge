@@ -7,7 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  # ── Backend Tests ──
   backend-tests:
     runs-on: ubuntu-latest
     steps:
@@ -29,8 +28,7 @@ jobs:
           cd backend
           python -m pytest tests/ -v --tb=short
 
-  # ── Extension Build ──
-  extension-build:
+  extension-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -50,7 +48,7 @@ jobs:
           cd vscode-extension
           npm run compile
 
-      - name: Lint (if configured)
+      - name: Run tests
         run: |
           cd vscode-extension
-          npx tsc --noEmit
+          npm test
