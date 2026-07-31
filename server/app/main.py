@@ -58,9 +58,8 @@ async def root(request: Request):
     if "text/html" in accept:
         dashboard_path = Path(__file__).parent / "templates" / "dashboard.html"
         if dashboard_path.exists():
-            return HTMLResponse(dashboard_path.read_text())
+            return HTMLResponse(dashboard_path.read_text(encoding="utf-8"))
     
-    # JSON fallback
     return JSONResponse({
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
