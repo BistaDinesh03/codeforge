@@ -68,19 +68,20 @@ export class ChatPanel {
   }
 
   private async sendMessage(text: string): Promise<void> {
+    // Add user message
+    this.panel.webview.postMessage({ command: "addMessage", text, type: "user" });
+
     try {
       this.panel.webview.postMessage({ command: "responseStart" });
-
-      const fullText = await this.apiClient.chatStream(
-        text,
-        (token) => {
-          this.panel.webview.postMessage({
-            command: "responseChunk",
-            text: token,
-          });
-        }
-      );
-
+      
+      // Use non-streaming chat for reliability
+      const response = await this.apiClient.chat(text);
+      
+      this.panel.webview.postMessage({
+        command: "addMessage",
+        text: response.response,
+        type: "ai",
+      });
       this.panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Connection failed";
@@ -88,11 +89,12 @@ export class ChatPanel {
       if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
         friendly = "Server is not running. Start it from the dashboard: http://localhost:8000";
       } else if (msg.includes("503") || msg.includes("No AI model")) {
-        friendly = "No AI model loaded. Open the dashboard to download one: http://localhost:8000";
+        friendly = "No AI model loaded. Open the dashboard to download one.";
       }
       this.panel.webview.postMessage({
-        command: "responseError",
-        error: friendly,
+        command: "addMessage",
+        text: friendly,
+        type: "error",
       });
     }
   }
