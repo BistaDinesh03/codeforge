@@ -14,7 +14,9 @@ from app.api.models import router as models_router
 from app.api.project import router as project_router
 from app.api.chat import router as chat_router
 from app.api.completion import router as completion_router
+from app.api.update import router as update_router
 from app.services.discovery import get_discovery_service
+from app.services.updater import check_for_updates
 
 setup_logging()
 logger = get_logger(__name__)
@@ -41,6 +43,7 @@ app.include_router(models_router)
 app.include_router(project_router)
 app.include_router(chat_router)
 app.include_router(completion_router)
+app.include_router(update_router)
 
 
 @app.exception_handler(Exception)
@@ -60,12 +63,12 @@ async def root():
         "status": "running",
         "endpoints": {
             "health": "/health",
-            "diagnostics": "/health/diagnostics",
             "version": "/version",
             "models": "/models",
             "project": "/project",
             "chat": "/chat",
             "completion": "/complete",
+            "update": "/update/check",
         },
     }
 
@@ -74,6 +77,15 @@ async def root():
 async def startup():
     discovery = get_discovery_service()
     discovery.start()
+    
+    # Check for updates (non-blocking, log only)
+    try:
+        update = check_for_updates()
+        if update:
+            logger.info(f"Update available: {update.version}")
+    except Exception:
+        pass
+    
     logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
 
 
