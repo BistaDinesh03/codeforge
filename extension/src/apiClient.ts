@@ -126,14 +126,20 @@ export class ApiClient {
     return fullText;
   }
 
-  async complete(prefix: string, suffix: string, language: string): Promise<{ completion: string }> {
-    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prefix, suffix, language }),
-    });
-    if (!response.ok) return { completion: "" };
-    return response.json() as Promise<{ completion: string }>;
+  async complete(prefix: string, suffix: string, language: string, signal?: AbortSignal): Promise<{ completion: string }> {
+    try {
+      const response = await this.fetchWithTimeout(`${this.config.serverUrl}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix, suffix, language }),
+        signal,
+        timeout: 3000,
+      });
+      if (!response.ok) return { completion: "" };
+      return response.json() as Promise<{ completion: string }>;
+    } catch {
+      return { completion: "" };
+    }
   }
 
   async explainCode(code: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
