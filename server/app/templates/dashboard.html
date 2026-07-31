@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeForge Dashboard</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;padding:24px}
+        .container{max-width:800px;margin:0 auto}
+        h1{font-size:24px;margin-bottom:8px;color:#58a6ff}
+        .subtitle{color:#8b949e;margin-bottom:24px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+        .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+        .card .label{font-size:12px;color:#8b949e;text-transform:uppercase;margin-bottom:4px}
+        .card .value{font-size:20px;font-weight:600}
+        .card .value.green{color:#3fb950}
+        .card .value.yellow{color:#d29922}
+        .card .value.red{color:#f85149}
+        .card .sub{font-size:12px;color:#8b949e;margin-top:4px}
+        .progress-bar{background:#21262d;border-radius:4px;height:8px;margin-top:8px;overflow:hidden}
+        .progress-fill{background:#238636;height:100%;border-radius:4px;transition:width 0.3s}
+        .buttons{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+        button{padding:8px 16px;border:1px solid #30363d;border-radius:6px;background:#21262d;color:#c9d1d9;cursor:pointer;font-size:13px}
+        button:hover{background:#30363d}
+        button.primary{background:#238636;border-color:#238636;color:white}
+        button.primary:hover{background:#2ea043}
+        button.danger{background:#da3633;border-color:#da3633;color:white}
+        button.danger:hover{background:#f85149}
+        .log{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;max-height:200px;overflow-y:auto;white-space:pre-wrap}
+        .refresh{font-size:12px;color:#8b949e;text-align:center;margin-top:16px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ CodeForge Dashboard</h1>
+        <p class="subtitle" id="subtitle">Loading...</p>
+
+        <div class="grid">
+            <div class="card">
+                <div class="label">Server</div>
+                <div class="value green" id="serverStatus">● Running</div>
+            </div>
+            <div class="card">
+                <div class="label">AI Model</div>
+                <div class="value" id="modelName">-</div>
+                <div class="sub" id="modelStatus"></div>
+            </div>
+            <div class="card">
+                <div class="label">RAM Usage</div>
+                <div class="value" id="ramValue">-</div>
+                <div class="progress-bar"><div class="progress-fill" id="ramBar" style="width:0%"></div></div>
+            </div>
+            <div class="card">
+                <div class="label">Version</div>
+                <div class="value" id="versionValue">-</div>
+                <div class="sub" id="updateInfo"></div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="primary" onclick="action('models/auto-load','POST')">▶ Start Server</button>
+            <button class="danger" onclick="action('models/unload','POST')">⏹ Stop Model</button>
+            <button onclick="action('update/check','GET')">🔄 Check Updates</button>
+            <button onclick="window.open('/docs')">📖 API Docs</button>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+            <div class="label">Model Download</div>
+            <div class="sub" id="modelRecommend"></div>
+            <button class="primary" style="margin-top:8px" id="downloadBtn" onclick="downloadModel()">⬇ Download Recommended Model</button>
+            <div class="progress-bar" style="margin-top:8px;display:none" id="downloadProgress">
+                <div class="progress-fill" id="downloadBar" style="width:0%"></div>
+            </div>
+            <div class="sub" id="downloadStatus" style="margin-top:4px"></div>
+        </div>
+
+        <div class="log" id="logWindow">Loading logs...</div>
+
+        <p class="refresh">Auto-refreshes every 5 seconds</p>
+    </div>
+
+    <script>
+        async function fetchData() {
+            try {
+                const health = await (await fetch('/health')).json();
+                const diag = await (await fetch('/health/diagnostics')).json();
+                const models = await (await fetch('/models/status')).json();
+                const rec = await (await fetch('/download/recommend')).json();
+
+                document.getElementById('subtitle').textContent = `Uptime: ${Math.floor(health.uptime_seconds/60)}m ${Math.floor(health.uptime_seconds%60)}s`;
+                document.getElementById('serverStatus').textContent = '● Running';
+                document.getElementById('serverStatus').className = 'value green';
+                
+                document.getElementById('modelName').textContent = models.model || 'No model loaded';
+                document.getElementById('modelStatus').textContent = models.status;
+
+                if (diag.system) {
+                    document.getElementById('ramValue').textContent = `${diag.disk.free_gb} GB free`;
+                    document.getElementById('ramBar').style.width = `${100 - diag.disk.used_percent}%`;
+                }
+
+                document.getElementById('versionValue').textContent = `v${health.version}`;
+
+                document.getElementById('modelRecommend').textContent = 
+                    `${rec.ram_gb}GB RAM detected → Recommended: ${rec.model_name} (${rec.size_mb} MB)`;
+
+                // Check for updates
+                const update = await (await fetch('/update/check')).json();
+                if (update.update_available) {
+                    document.getElementById('updateInfo').textContent = `Update available: v${update.latest_version}`;
+                    document.getElementById('updateInfo').style.color = '#d29922';
+                }
+
+                document.getElementById('logWindow').textContent = 
+                    `Server v${health.version} | Environment: ${diag.environment} | Python: ${diag.system?.python || 'N/A'}\n` +
+                    `Models available: ${diag.models_available} | Disk: ${diag.disk.free_gb}/${diag.disk.total_gb} GB`;
+                
+            } catch(e) {
+                document.getElementById('serverStatus').textContent = '● Offline';
+                document.getElementById('serverStatus').className = 'value red';
+            }
+        }
+
+        async function action(path, method) {
+            try {
+                await fetch(`/${path}`, { method });
+                fetchData();
+            } catch(e) {
+                alert('Failed: ' + e.message);
+            }
+        }
+
+        async function downloadModel() {
+            const rec = await (await fetch('/download/recommend')).json();
+            const btn = document.getElementById('downloadBtn');
+            const bar = document.getElementById('downloadProgress');
+            const status = document.getElementById('downloadStatus');
+            
+            btn.disabled = true;
+            bar.style.display = 'block';
+            
+            await fetch(`/download/start/${rec.recommended_model}`, { method: 'POST' });
+            
+            const evtSource = new EventSource(`/download/progress/${rec.recommended_model}`);
+            evtSource.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.percent !== undefined) {
+                    document.getElementById('downloadBar').style.width = data.percent + '%';
+                    status.textContent = `${data.downloaded_mb}/${data.total_mb} MB (${data.percent}%)`;
+                }
+                if (data.status === 'complete') {
+                    status.textContent = 'Download complete! Loading model...';
+                    evtSource.close();
+                    action('models/auto-load', 'POST');
+                }
+            };
+        }
+
+        fetchData();
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+</html>

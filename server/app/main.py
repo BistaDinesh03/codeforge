@@ -4,7 +4,8 @@ CodeForge Server - Main entry point.
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
@@ -21,11 +22,7 @@ from app.services.updater import check_for_updates
 setup_logging()
 logger = get_logger(__name__)
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    description="Private AI coding server.",
-    version=settings.APP_VERSION,
-)
+app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,20 +46,26 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={
-            "detail": "Internal server error. Check logs/errors.log",
-            "error_code": "INTERNAL_ERROR",
-        },
+        content={"detail": "Internal server error", "error_code": "INTERNAL_ERROR"},
     )
 
 
-@app.get("/")
-async def root():
-    return {
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Return dashboard HTML for browsers, JSON for API clients."""
+    accept = request.headers.get("accept", "")
+    
+    if "text/html" in accept:
+        dashboard_path = Path(__file__).parent / "templates" / "dashboard.html"
+        if dashboard_path.exists():
+            return HTMLResponse(dashboard_path.read_text())
+    
+    # JSON fallback
+    return JSONResponse({
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "status": "running",
-    }
+    })
 
 
 @app.on_event("startup")
