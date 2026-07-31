@@ -11,6 +11,8 @@ let statusBar: StatusBarManager;
 let apiClient: ApiClient;
 let codeActions: CodeActionProvider;
 let reconnectTimer: NodeJS.Timeout | undefined;
+let retryCount = 0;
+const MAX_RETRIES = 5;
 
 export function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration("codeforge");
@@ -41,6 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
         maxTokens: c.get("maxTokens", 2048),
         temperature: c.get("temperature", 0.7),
       });
+      retryCount = 0;
       connect();
     }
   });
@@ -59,6 +62,7 @@ export function activate(context: vscode.ExtensionContext) {
       codeActions.rewriteCode().catch(showError);
     }),
     vscode.commands.registerCommand("codeforge.reconnect", () => {
+      retryCount = 0;
       connect();
     }),
     statusBar
@@ -67,43 +71,63 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function connect(): Promise<void> {
   statusBar.setConnected(false);
+
+  // Try current URL first
   const healthy = await apiClient.healthCheck();
   if (healthy) {
     statusBar.setConnected(true);
-    startReconnectTimer();
+    retryCount = 0;
+    startHealthMonitor();
     return;
   }
 
+  // Try auto-discovery
   try {
     const discovery = new ServerDiscovery();
-    const server = await discovery.discover(8000);
+    const server = await discovery.discover(5000);
     apiClient.updateConfig({ serverUrl: `http://${server.host}:${server.port}` });
     const found = await apiClient.healthCheck();
     if (found) {
       statusBar.setConnected(true);
-      vscode.window.showInformationMessage(`Connected to ${server.name}`);
-      startReconnectTimer();
+      retryCount = 0;
+      vscode.window.showInformationMessage(`CodeForge: Connected to ${server.name}`);
+      startHealthMonitor();
       return;
     }
   } catch {
-    showError("Cannot find CodeForge server on your network.");
+    // Discovery failed, will retry
   }
-  statusBar.setConnected(false);
+
+  // Retry with backoff
+  retryCount++;
+  if (retryCount <= MAX_RETRIES) {
+    const delay = Math.min(2000 * Math.pow(2, retryCount - 1), 30000);
+    statusBar.setConnected(false);
+    setTimeout(() => connect(), delay);
+  } else {
+    showError("Cannot connect after multiple attempts. Check if server is running.");
+  }
 }
 
-function startReconnectTimer(): void {
+function startHealthMonitor(): void {
   stopReconnectTimer();
   reconnectTimer = setInterval(async () => {
-    if (!(await apiClient.healthCheck())) {
+    const healthy = await apiClient.healthCheck();
+    if (!healthy) {
       statusBar.setConnected(false);
-      stopReconnectTimer();
-      setTimeout(() => connect(), 5000);
+      retryCount = 0;
+      connect();
+    } else {
+      statusBar.setConnected(true);
     }
-  }, 30000);
+  }, 15000); // Check every 15 seconds
 }
 
 function stopReconnectTimer(): void {
-  if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = undefined; }
+  if (reconnectTimer) {
+    clearInterval(reconnectTimer);
+    reconnectTimer = undefined;
+  }
 }
 
 export function deactivate(): void {

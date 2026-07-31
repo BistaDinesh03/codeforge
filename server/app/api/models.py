@@ -1,6 +1,6 @@
 """
 Model management API endpoints.
-List models, load/unload, check status.
+List models, load/unload, check status, auto-recover.
 """
 
 from fastapi import APIRouter, HTTPException
@@ -42,7 +42,6 @@ async def list_models():
     """List all available models in the models directory."""
     manager = _get_manager()
     models = manager.list_available_models()
-    
     return [
         ModelListItem(name=m.name, size_mb=m.size_mb, path=m.path)
         for m in models
@@ -58,19 +57,14 @@ async def model_status():
 
 @router.post("/load", response_model=ModelStatusResponse)
 async def load_model(request: LoadRequest):
-    """
-    Load a specific model by name.
-    The model must be in the models directory as {name}.gguf
-    """
+    """Load a specific model by name."""
     manager = _get_manager()
-    
     try:
         manager.load_model(request.model_name)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
     return ModelStatusResponse(**manager.get_status_dict())
 
 
@@ -87,16 +81,42 @@ async def auto_load_model():
     """Auto-detect and load the best model for this hardware."""
     manager = _get_manager()
     model_name = manager.auto_detect_model()
-    
     if not model_name:
         raise HTTPException(
             status_code=404,
             detail="No models found. Download a GGUF model to the models directory."
         )
-    
     try:
         manager.load_model(model_name)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    return ModelStatusResponse(**manager.get_status_dict())
+
+
+@router.post("/recover", response_model=ModelStatusResponse)
+async def recover_model():
+    """Try to reload the model if it crashed or unloaded unexpectedly."""
+    manager = _get_manager()
+    
+    if manager.is_loaded():
+        return ModelStatusResponse(**manager.get_status_dict())
+    
+    # Try reloading the last known model
+    if manager.current_model_name:
+        try:
+            manager.load_model(manager.current_model_name)
+            logger.info(f"Recovered model: {manager.current_model_name}")
+            return ModelStatusResponse(**manager.get_status_dict())
+        except Exception as e:
+            logger.warning(f"Recovery failed for {manager.current_model_name}: {e}")
+    
+    # Try auto-detecting
+    try:
+        model_name = manager.auto_detect_model()
+        if model_name:
+            manager.load_model(model_name)
+            logger.info(f"Auto-loaded model during recovery: {model_name}")
+    except Exception as e:
+        logger.warning(f"Auto-detect recovery failed: {e}")
     
     return ModelStatusResponse(**manager.get_status_dict())
