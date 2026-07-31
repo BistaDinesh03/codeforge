@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
 from app.api.health import router as health_router
+from app.api.models import router as models_router
 
 # Initialize logging first
 setup_logging()
@@ -27,7 +28,7 @@ app = FastAPI(
     redoc_url=None,
 )
 
-# CORS - Allow VS Code extension to connect from any origin
+# CORS - Allow VS Code extension to connect
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -38,6 +39,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router)
+app.include_router(models_router)
 
 
 # Global error handler
@@ -65,12 +67,12 @@ async def root():
             "health": "/health",
             "diagnostics": "/health/diagnostics",
             "version": "/version",
+            "models": "/models",
             "docs": "/docs" if settings.DEBUG else "disabled",
         },
     }
 
 
-# Startup and shutdown events
 @app.on_event("startup")
 async def startup():
     logger.info("Server started successfully")
