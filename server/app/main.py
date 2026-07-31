@@ -12,6 +12,7 @@ from app.core.logging_config import setup_logging, get_logger
 from app.api.health import router as health_router
 from app.api.models import router as models_router
 from app.api.project import router as project_router
+from app.services.discovery import get_discovery_service
 
 setup_logging()
 logger = get_logger(__name__)
@@ -67,9 +68,14 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
+    # Start network discovery
+    discovery = get_discovery_service()
+    discovery.start()
     logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
 
 
 @app.on_event("shutdown")
 async def shutdown():
+    discovery = get_discovery_service()
+    discovery.stop()
     logger.info("Server shutting down")
