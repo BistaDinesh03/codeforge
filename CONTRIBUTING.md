@@ -1,23 +1,32 @@
-# Contributing to CodeForge
+# Contributing
 
-Thank you for your interest in contributing! This guide will help you get started.
+## Quick Setup
 
-## Code of Conduct
+```bash
+# Backend
+cd server
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python -m pytest tests/ -v
 
-Be respectful, be helpful, be kind. We're building something together.
+# Extension
+cd extension
+npm install
+npm run compile
+npm test
+Rules
+Write tests with new features
 
-## Getting Started
+Run all tests before committing
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Git
-- VS Code
-- ADB (for testing phone connection)
+Use feat:, fix:, docs: for commit messages
 
-### Development Setup
+Keep it simple
 
-1. **Fork and clone**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/codeforge.git
-   cd codeforge
+Questions?
+Open an issue.
+
+text
+
+Save. Type "NEXT."

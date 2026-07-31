@@ -1,42 +1,24 @@
-# CodeForge Roadmap
+# Roadmap
 
-## Phase 1: Foundation (Current)
-**Goal:** Working skeleton - server runs, extension loads
+## Done
+- [x] Server foundation (FastAPI, health, config)
+- [x] Model management (load, unload, switch)
+- [x] Chat with streaming
+- [x] Inline code completions
+- [x] Project indexing (BM25 search)
+- [x] VS Code extension (chat, actions, status bar)
+- [x] Auto-discovery (UDP broadcast)
+- [x] Windows installer
+- [x] Auto-updater
 
-- [x] Project structure & repository setup
-- [x] FastAPI backend with health endpoint
-- [ ] VS Code extension compilation & loading
-- [ ] ADB communication proof-of-concept
+## Next (v1.1)
+- [ ] Multi-file edits
+- [ ] Agent mode ("build a login system")
+- [ ] Fine-tuning support
+- [ ] More models in installer
 
-## Phase 2: Core Communication
-**Goal:** VS Code talks to Android backend
-
-- [ ] Extension sends HTTP requests to backend
-- [ ] Backend responds with generated text
-- [ ] Status bar shows connection state
-- [ ] Error handling for connection failures
-
-## Phase 3: AI Integration
-**Goal:** Real AI responses from phone
-
-- [ ] llama.cpp setup in Termux
-- [ ] Model loading & management
-- [ ] Code completion endpoint
-- [ ] Code explanation endpoint
-
-## Phase 4: Developer Experience
-**Goal:** Feels native to VS Code
-
-- [ ] Context-aware suggestions
-- [ ] Inline completions
-- [ ] Sidebar chat panel
-- [ ] Multiple model support
-
-## Phase 5: Production Ready
-**Goal:** Stable, secure, documented
-
-- [ ] End-to-end tests
-- [ ] Security audit
-- [ ] Full API documentation
-- [ ] VS Code marketplace publication
-- [ ] v1.0 release
+## Future (v1.2+)
+- [ ] Team server (multiple users)
+- [ ] Code review agent
+- [ ] Docker one-click deploy
+- [ ] VS Code Marketplace publish
