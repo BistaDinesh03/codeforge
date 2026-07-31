@@ -57,7 +57,7 @@ def check_for_updates() -> Optional[UpdateInfo]:
             return None
         
         if latest == current:
-            logger.info(f"Already at latest version: {current}")
+            logger.debug(f"Already at latest version: {current}")
             return None
         
         # Find server asset
@@ -83,7 +83,7 @@ def check_for_updates() -> Optional[UpdateInfo]:
         )
         
     except Exception as e:
-        logger.debug(f"Update check failed: {e}")
+        logger.debug(f"Update check failed (normal if offline): {e}")
         return None
 
 
@@ -112,7 +112,6 @@ def rollback_to_backup() -> bool:
         return False
     
     try:
-        # Remove current (broken) version
         for item in base_dir.iterdir():
             if item.name not in ("venv", "models", "logs"):
                 if item.is_dir():
@@ -120,7 +119,6 @@ def rollback_to_backup() -> bool:
                 else:
                     item.unlink()
         
-        # Restore from backup
         for item in backup_dir.iterdir():
             dest = base_dir / item.name
             if item.is_dir():
@@ -144,17 +142,14 @@ def perform_update(download_url: str) -> bool:
     backup_current_version()
     
     try:
-        # Download update
         logger.info(f"Downloading update from {download_url}")
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
             urllib.request.urlretrieve(download_url, tmp.name)
             zip_path = tmp.name
         
-        # Extract to temp directory
         extract_dir = tempfile.mkdtemp()
         shutil.unpack_archive(zip_path, extract_dir)
         
-        # Find server directory in extracted files
         server_dir = None
         for root, dirs, files in os.walk(extract_dir):
             if "app" in dirs and "requirements.txt" in files:
@@ -164,7 +159,6 @@ def perform_update(download_url: str) -> bool:
         if not server_dir:
             raise Exception("Could not find server files in update package")
         
-        # Copy new files over old ones
         base_dir = settings.BASE_DIR
         for item in server_dir.iterdir():
             dest = base_dir / item.name
@@ -175,7 +169,6 @@ def perform_update(download_url: str) -> bool:
             else:
                 shutil.copy2(item, dest)
         
-        # Cleanup
         os.unlink(zip_path)
         shutil.rmtree(extract_dir)
         
@@ -191,6 +184,4 @@ def perform_update(download_url: str) -> bool:
 def restart_server() -> None:
     """Restart the server process."""
     logger.info("Restarting server...")
-    # The server process will be restarted by the service manager
-    # or the user can restart manually
     os.execv(sys.executable, [sys.executable] + sys.argv)

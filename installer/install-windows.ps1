@@ -16,6 +16,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ServerSource = Join-Path (Join-Path $ScriptDir "..") "server"
+
 Clear-Host
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "   CodeForge Server Installer v1.0" -ForegroundColor Cyan
@@ -91,10 +92,20 @@ $startBat = @"
 title CodeForge Server
 cd /d "$InstallPath"
 call venv\Scripts\activate
-echo CodeForge Server: http://localhost:8000
-start http://localhost:8000
+
+:loop
+echo ============================================
+echo   CodeForge Server
+echo   http://localhost:8000
+echo ============================================
+echo.
+echo Starting server... (auto-restarts if crashed)
+echo.
 uvicorn app.main:app --host 0.0.0.0 --port 8000
-pause
+echo.
+echo Server stopped. Restarting in 3 seconds...
+timeout /t 3 >nul
+goto loop
 "@
 $startBatPath = Join-Path $InstallPath "Start Server.bat"
 $startBat | Out-File -FilePath $startBatPath -Encoding ASCII

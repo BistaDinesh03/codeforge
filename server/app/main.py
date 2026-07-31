@@ -51,7 +51,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "error_code": "INTERNAL_ERROR"},
+        content={
+            "detail": "Internal server error. Check logs for details.",
+            "error_code": "INTERNAL_ERROR",
+            "help": "If this persists, restart the server or check logs/errors.log"
+        },
     )
 
 
@@ -78,7 +82,6 @@ async def startup():
     discovery = get_discovery_service()
     discovery.start()
     
-    # Check for updates (non-blocking, log only)
     try:
         update = check_for_updates()
         if update:

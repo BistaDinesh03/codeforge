@@ -2,6 +2,11 @@ import * as vscode from "vscode";
 import { ApiClient } from "./apiClient";
 import { ChatPanel } from "./chatPanel";
 
+/**
+ * Provides code actions with safe editing.
+ * Every AI modification shows a diff preview first.
+ * Changes use WorkspaceEdit for undo support.
+ */
 export class CodeActionProvider {
   private apiClient: ApiClient;
 
@@ -25,11 +30,6 @@ export class CodeActionProvider {
   getLanguage(): string {
     const editor = vscode.window.activeTextEditor;
     return editor ? editor.document.languageId : "text";
-  }
-
-  getWorkspacePath(): string | undefined {
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    return folder?.uri.fsPath;
   }
 
   async explainCode(): Promise<void> {
@@ -65,15 +65,23 @@ export class CodeActionProvider {
       async () => {
         try {
           const result = await this.apiClient.generateCode(description, language);
-          const choice = await vscode.window.showInformationMessage(
-            "Insert generated code?", { modal: false }, "Insert at Cursor", "Replace Selection", "Cancel"
-          );
           const editor = vscode.window.activeTextEditor;
           if (!editor) return;
-          if (choice === "Insert at Cursor") {
-            await editor.edit((edit) => { edit.insert(editor.selection.active, result.response); });
-          } else if (choice === "Replace Selection") {
-            await editor.edit((edit) => { edit.replace(editor.selection, result.response); });
+
+          // Show diff preview before inserting
+          const accepted = await this.showDiffPreview(
+            "",
+            result.response,
+            language,
+            "Generated Code"
+          );
+
+          if (accepted) {
+            await this.applyEdit(
+              editor.document.uri,
+              editor.selection,
+              result.response
+            );
           }
         } catch (error) {
           vscode.window.showErrorMessage(`CodeForge: ${error instanceof Error ? error.message : "Failed"}`);
@@ -83,42 +91,117 @@ export class CodeActionProvider {
   }
 
   async rewriteCode(): Promise<void> {
-    const { text } = this.getSelectedOrLineText();
-    if (!text.trim()) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    const selection = editor.selection;
+    if (selection.isEmpty) {
       vscode.window.showWarningMessage("Select code to rewrite.");
       return;
     }
+
+    const text = editor.document.getText(selection);
     const language = this.getLanguage();
+
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: "CodeForge: Rewriting code..." },
       async () => {
         try {
           const result = await this.apiClient.rewriteCode(text, language);
-          const originalUri = vscode.Uri.parse(`untitled:original.${language}`);
-          const rewrittenUri = vscode.Uri.parse(`untitled:rewritten.${language}`);
-          const origDoc = await vscode.workspace.openTextDocument(originalUri);
-          const rewrDoc = await vscode.workspace.openTextDocument(rewrittenUri);
-          const origEdit = new vscode.WorkspaceEdit();
-          origEdit.insert(originalUri, new vscode.Position(0, 0), text);
-          await vscode.workspace.applyEdit(origEdit);
-          const rewrEdit = new vscode.WorkspaceEdit();
-          rewrEdit.insert(rewrittenUri, new vscode.Position(0, 0), result.response);
-          await vscode.workspace.applyEdit(rewrEdit);
-          await vscode.commands.executeCommand("vscode.diff", originalUri, rewrittenUri, "CodeForge: Original ↔ Rewritten");
-          const choice = await vscode.window.showInformationMessage(
-            "Accept this rewrite?", { modal: false }, "Accept", "Reject"
+
+          // Show diff preview
+          const accepted = await this.showDiffPreview(
+            text,
+            result.response,
+            language,
+            "Rewrite Suggestion"
           );
-          if (choice === "Accept") {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-              await editor.edit((edit) => { edit.replace(editor.selection, result.response); });
-            }
-            vscode.window.showInformationMessage("CodeForge: Changes applied ✓");
+
+          if (accepted) {
+            await this.applyEdit(
+              editor.document.uri,
+              selection,
+              result.response
+            );
+            vscode.window.showInformationMessage("CodeForge: Changes applied ✓ (Ctrl+Z to undo)");
           }
         } catch (error) {
           vscode.window.showErrorMessage(`CodeForge: ${error instanceof Error ? error.message : "Failed"}`);
         }
       }
     );
+  }
+
+  /**
+   * Show a diff preview and ask user to accept or reject.
+   * Returns true if user accepts, false if rejected.
+   */
+  private async showDiffPreview(
+    original: string,
+    modified: string,
+    language: string,
+    title: string
+  ): Promise<boolean> {
+    // Create temp URIs for diff view
+    const timestamp = Date.now();
+    const originalUri = vscode.Uri.parse(`untitled:original-${timestamp}.${language}`);
+    const modifiedUri = vscode.Uri.parse(`untitled:codeforge-${timestamp}.${language}`);
+
+    // Create documents with content
+    const origDoc = await vscode.workspace.openTextDocument(originalUri);
+    const modDoc = await vscode.workspace.openTextDocument(modifiedUri);
+
+    // Insert content using WorkspaceEdit
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(originalUri, new vscode.Position(0, 0), original);
+    edit.insert(modifiedUri, new vscode.Position(0, 0), modified);
+    await vscode.workspace.applyEdit(edit);
+
+    // Close the documents (they'll reopen in diff view)
+    await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+
+    // Open diff view
+    await vscode.commands.executeCommand(
+      "vscode.diff",
+      originalUri,
+      modifiedUri,
+      `CodeForge: ${title} (Original vs AI Suggestion)`
+    );
+
+    // Ask user
+    const choice = await vscode.window.showInformationMessage(
+      `${title}: Apply this change to your file?`,
+      { modal: true },
+      "Accept",
+      "Reject"
+    );
+
+    return choice === "Accept";
+  }
+
+  /**
+   * Apply text to a document using WorkspaceEdit.
+   * This makes the change undoable with Ctrl+Z.
+   */
+  private async applyEdit(
+    uri: vscode.Uri,
+    range: vscode.Range | vscode.Selection,
+    newText: string
+  ): Promise<void> {
+    const edit = new vscode.WorkspaceEdit();
+
+    if (range.isEmpty) {
+      // Insert at position
+      edit.insert(uri, range.start, newText);
+    } else {
+      // Replace selection
+      edit.replace(uri, range, newText);
+    }
+
+    const success = await vscode.workspace.applyEdit(edit);
+    if (!success) {
+      vscode.window.showErrorMessage("CodeForge: Failed to apply edit. File may be read-only.");
+    }
   }
 }
