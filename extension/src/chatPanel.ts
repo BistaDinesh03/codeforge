@@ -70,12 +70,17 @@ export class ChatPanel {
   private async sendMessage(text: string): Promise<void> {
     try {
       this.panel.webview.postMessage({ command: "responseStart" });
-      const response = await this.apiClient.chat(text);
-      this.panel.webview.postMessage({
-        command: "responseChunk",
-        text: response.response,
-        speed: response.tokens_per_second,
-      });
+
+      const fullText = await this.apiClient.chatStream(
+        text,
+        (token) => {
+          this.panel.webview.postMessage({
+            command: "responseChunk",
+            text: token,
+          });
+        }
+      );
+
       this.panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
       this.panel.webview.postMessage({

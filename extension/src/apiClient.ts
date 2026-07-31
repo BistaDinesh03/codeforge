@@ -64,8 +64,80 @@ export class ApiClient {
     return response.json() as Promise<ChatResponse>;
   }
 
+  async chatStream(
+    message: string,
+    onToken: (token: string) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Server error ${response.status}: ${err}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const decoder = new TextDecoder();
+    let fullText = "";
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.token) {
+                fullText += data.token;
+                onToken(data.token);
+              }
+              if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              if (e instanceof SyntaxError) continue;
+              throw e;
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return fullText;
+  }
+
+  async complete(prefix: string, suffix: string, language: string): Promise<{ completion: string }> {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix, suffix, language }),
+    });
+    if (!response.ok) return { completion: "" };
+    return response.json() as Promise<{ completion: string }>;
+  }
+
   async explainCode(code: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
-    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/explain?language=${language}`, {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/explain`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, language }),
@@ -79,7 +151,7 @@ export class ApiClient {
   }
 
   async generateCode(description: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
-    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/generate?language=${language}`, {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ description, language }),
@@ -93,7 +165,7 @@ export class ApiClient {
   }
 
   async rewriteCode(code: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
-    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/rewrite?language=${language}`, {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/rewrite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, language }),
@@ -107,7 +179,7 @@ export class ApiClient {
   }
 
   private async fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
-    const { timeout = 30000, ...fetchOptions } = options;
+    const { timeout = 60000, ...fetchOptions } = options;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {

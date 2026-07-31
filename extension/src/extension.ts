@@ -4,6 +4,7 @@ import { StatusBarManager } from "./statusBar";
 import { ChatPanel } from "./chatPanel";
 import { CodeActionProvider } from "./codeActions";
 import { ServerDiscovery } from "./discovery";
+import { InlineCompletionProvider } from "./inlineCompletion";
 
 let statusBar: StatusBarManager;
 let apiClient: ApiClient;
@@ -23,6 +24,13 @@ export function activate(context: vscode.ExtensionContext) {
   apiClient = new ApiClient(serverConfig);
   statusBar = new StatusBarManager();
   codeActions = new CodeActionProvider(apiClient);
+
+  // Register inline completion provider
+  const completionProvider = new InlineCompletionProvider(apiClient);
+  vscode.languages.registerInlineCompletionItemProvider(
+    { pattern: "**" },
+    completionProvider
+  );
 
   // Auto-connect
   if (config.get("autoConnect", true)) {
@@ -66,7 +74,6 @@ export function activate(context: vscode.ExtensionContext) {
 async function connect(): Promise<void> {
   statusBar.setConnected(false);
 
-  // First, try current URL (might be localhost or manual IP)
   const healthy = await apiClient.healthCheck();
   if (healthy) {
     statusBar.setConnected(true);
@@ -78,43 +85,31 @@ async function connect(): Promise<void> {
     return;
   }
 
-  // Try auto-discovery
-  vscode.window.setStatusBarMessage("$(search) CodeForge: Searching for server...", 10000);
+  vscode.window.setStatusBarMessage("$(search) CodeForge: Searching for server...", 8000);
 
   try {
     const discovery = new ServerDiscovery();
-    const server = await discovery.discover(8000); // 8 second timeout
-
+    const server = await discovery.discover(8000);
     const serverUrl = `http://${server.host}:${server.port}`;
     apiClient.updateConfig({ serverUrl });
-
-    // Update VS Code settings with discovered URL
     const config = vscode.workspace.getConfiguration("codeforge");
     config.update("serverUrl", serverUrl, vscode.ConfigurationTarget.Global);
-
-    // Verify connection
     const found = await apiClient.healthCheck();
     if (found) {
       statusBar.setConnected(true);
       statusBar.setModel(server.version);
-      vscode.window.showInformationMessage(
-        `CodeForge: Connected to ${server.name} (${server.host})`
-      );
+      vscode.window.showInformationMessage(`CodeForge: Connected to ${server.name}`);
       startReconnectTimer();
       return;
     }
   } catch (err) {
-    // Discovery failed, show friendly message
     vscode.window.showWarningMessage(
       err instanceof Error ? err.message : "Cannot find CodeForge server",
       { modal: false },
       "Manual Setup..."
     ).then((choice) => {
       if (choice === "Manual Setup...") {
-        vscode.commands.executeCommand(
-          "workbench.action.openSettings",
-          "codeforge.serverUrl"
-        );
+        vscode.commands.executeCommand("workbench.action.openSettings", "codeforge.serverUrl");
       }
     });
   }

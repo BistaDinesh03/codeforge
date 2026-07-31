@@ -13,6 +13,7 @@ from app.api.health import router as health_router
 from app.api.models import router as models_router
 from app.api.project import router as project_router
 from app.api.chat import router as chat_router
+from app.api.completion import router as completion_router
 from app.services.discovery import get_discovery_service
 
 setup_logging()
@@ -39,6 +40,7 @@ app.include_router(health_router)
 app.include_router(models_router)
 app.include_router(project_router)
 app.include_router(chat_router)
+app.include_router(completion_router)
 
 
 @app.exception_handler(Exception)
@@ -63,6 +65,7 @@ async def root():
             "models": "/models",
             "project": "/project",
             "chat": "/chat",
+            "completion": "/complete",
         },
     }
 

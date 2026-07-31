@@ -1,12 +1,15 @@
 """
-Chat API endpoint - the main AI interaction point.
+Chat API endpoints - streaming and non-streaming AI responses.
 """
 
-from fastapi import APIRouter, HTTPException
+import asyncio
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+import json
 
 from app.services.model_manager import ModelManager
-from app.services.inference import chat, generate_code, explain_code
+from app.services.inference import chat, explain_code, generate_code
 from app.services.context_builder import build_context
 from app.core.logging_config import get_logger
 
@@ -50,10 +53,11 @@ def _get_manager() -> ModelManager:
 
 @router.post("", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
+    """Non-streaming chat. Returns full response at once."""
     manager = _get_manager()
     
     if not manager.is_loaded():
-        raise HTTPException(status_code=503, detail="No AI model loaded")
+        raise HTTPException(status_code=503, detail="No AI model loaded. Load a model first.")
     
     try:
         message = request.message
@@ -76,7 +80,78 @@ async def chat_endpoint(request: ChatRequest):
         )
     except Exception as e:
         logger.error(f"Chat failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+
+
+@router.post("/stream")
+async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
+    """
+    Streaming chat using Server-Sent Events.
+    Tokens are sent as they are generated: data: {"token": "def"}\n\n
+    """
+    manager = _get_manager()
+    
+    if not manager.is_loaded():
+        raise HTTPException(status_code=503, detail="No AI model loaded. Load a model first.")
+    
+    async def generate():
+        try:
+            message = request.message
+            
+            if request.include_context and request.project_path:
+                try:
+                    context = build_context(query=message, project_path=request.project_path, max_files=3)
+                    if context.context_text:
+                        message = f"Here are relevant files:\n\n{context.context_text}\n\nUser: {request.message}"
+                except Exception as e:
+                    logger.warning(f"Context failed: {e}")
+            
+            # Build prompt
+            prompt = [
+                {"role": "system", "content": "You are a helpful AI coding assistant."},
+                {"role": "user", "content": message}
+            ]
+            
+            # Stream from llama.cpp
+            stream = manager.current_model.create_chat_completion(
+                messages=prompt,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                stream=True,
+            )
+            
+            # Send each token as SSE
+            for chunk in stream:
+                # Check if client disconnected
+                if await http_request.is_disconnected():
+                    logger.info("Client disconnected during streaming")
+                    break
+                
+                if "choices" in chunk and chunk["choices"]:
+                    delta = chunk["choices"][0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        data = json.dumps({"token": content})
+                        yield f"data: {data}\n\n"
+                        await asyncio.sleep(0)  # Yield to event loop
+            
+            # Send done signal
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Stream failed: {e}")
+            error_data = json.dumps({"error": str(e)})
+            yield f"data: {error_data}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 
 @router.post("/explain", response_model=ChatResponse)
