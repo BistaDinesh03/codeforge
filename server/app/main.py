@@ -1,0 +1,82 @@
+"""
+CodeForge Server - Main entry point.
+Run with: uvicorn app.main:app --host 0.0.0.0 --port 8000
+"""
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.core.config import settings
+from app.core.logging_config import setup_logging, get_logger
+from app.api.health import router as health_router
+
+# Initialize logging first
+setup_logging()
+logger = get_logger(__name__)
+
+logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+logger.info(f"Environment: {settings.ENVIRONMENT}")
+
+# Create FastAPI app
+app = FastAPI(
+    title=settings.APP_NAME,
+    description="Private AI coding server. Runs on any computer, connects to VS Code.",
+    version=settings.APP_VERSION,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url=None,
+)
+
+# CORS - Allow VS Code extension to connect from any origin
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
+)
+
+# Include routers
+app.include_router(health_router)
+
+
+# Global error handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch all unhandled errors and return a clean response."""
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error_code": "INTERNAL_ERROR",
+        },
+    )
+
+
+@app.get("/")
+async def root():
+    """Welcome endpoint. Shows server info and available endpoints."""
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "diagnostics": "/health/diagnostics",
+            "version": "/version",
+            "docs": "/docs" if settings.DEBUG else "disabled",
+        },
+    }
+
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup():
+    logger.info("Server started successfully")
+    logger.info(f"Listening on {settings.HOST}:{settings.PORT}")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    logger.info("Server shutting down")
