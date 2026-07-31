@@ -26,6 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
   apiClient = new ApiClient(serverConfig);
   statusBar = new StatusBarManager();
   codeActions = new CodeActionProvider(apiClient);
+  ChatPanel.init(context);
 
   vscode.languages.registerInlineCompletionItemProvider(
     { pattern: "**" },
