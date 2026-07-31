@@ -11,15 +11,13 @@ from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
 from app.api.health import router as health_router
 from app.api.models import router as models_router
+from app.api.project import router as project_router
 
-# Initialize logging first
 setup_logging()
 logger = get_logger(__name__)
 
 logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-logger.info(f"Environment: {settings.ENVIRONMENT}")
 
-# Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     description="Private AI coding server. Runs on any computer, connects to VS Code.",
@@ -28,7 +26,6 @@ app = FastAPI(
     redoc_url=None,
 )
 
-# CORS - Allow VS Code extension to connect
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -37,28 +34,22 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
-# Include routers
 app.include_router(health_router)
 app.include_router(models_router)
+app.include_router(project_router)
 
 
-# Global error handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Catch all unhandled errors and return a clean response."""
     logger.error(f"Unhandled error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={
-            "detail": "Internal server error",
-            "error_code": "INTERNAL_ERROR",
-        },
+        content={"detail": "Internal server error", "error_code": "INTERNAL_ERROR"},
     )
 
 
 @app.get("/")
 async def root():
-    """Welcome endpoint. Shows server info and available endpoints."""
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
@@ -68,6 +59,7 @@ async def root():
             "diagnostics": "/health/diagnostics",
             "version": "/version",
             "models": "/models",
+            "project": "/project",
             "docs": "/docs" if settings.DEBUG else "disabled",
         },
     }
@@ -75,8 +67,7 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
-    logger.info("Server started successfully")
-    logger.info(f"Listening on {settings.HOST}:{settings.PORT}")
+    logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
 
 
 @app.on_event("shutdown")
