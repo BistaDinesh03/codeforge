@@ -11,105 +11,51 @@ export class ChatPanel {
   private apiClient: ApiClient;
   private statusBar: StatusBarManager;
 
-  private constructor(
-    panel: vscode.WebviewPanel,
-    extensionUri: vscode.Uri,
-    apiClient: ApiClient,
-    statusBar: StatusBarManager
-  ) {
-    this.panel = panel;
-    this.apiClient = apiClient;
-    this.statusBar = statusBar;
-
-    this.panel.webview.html = this.getHtml(extensionUri);
+  private constructor(panel: vscode.WebviewPanel, extUri: vscode.Uri, apiClient: ApiClient, statusBar: StatusBarManager) {
+    this.panel = panel; this.apiClient = apiClient; this.statusBar = statusBar;
+    this.panel.webview.html = this.getHtml(extUri);
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    this.panel.webview.onDidReceiveMessage(
-      (msg) => this.handleMessage(msg),
-      null,
-      this.disposables
-    );
+    this.panel.webview.onDidReceiveMessage((msg) => this.handle(msg), null, this.disposables);
   }
 
-  public static createOrShow(
-    extensionUri: vscode.Uri,
-    apiClient: ApiClient,
-    statusBar: StatusBarManager
-  ): void {
-    if (ChatPanel.currentPanel) {
-      ChatPanel.currentPanel.panel.reveal(vscode.ViewColumn.Two);
-      return;
-    }
-
-    const panel = vscode.window.createWebviewPanel(
-      "codeforgeChat",
-      "CodeForge Chat",
-      vscode.ViewColumn.Two,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-      }
-    );
-
-    ChatPanel.currentPanel = new ChatPanel(panel, extensionUri, apiClient, statusBar);
+  public static createOrShow(extUri: vscode.Uri, apiClient: ApiClient, statusBar: StatusBarManager): void {
+    if (ChatPanel.currentPanel) { ChatPanel.currentPanel.panel.reveal(vscode.ViewColumn.Two); return; }
+    const panel = vscode.window.createWebviewPanel("codeforgeChat", "CodeForge", vscode.ViewColumn.Two, { enableScripts: true, retainContextWhenHidden: true });
+    ChatPanel.currentPanel = new ChatPanel(panel, extUri, apiClient, statusBar);
   }
 
   public static addMessage(text: string, type: "user" | "ai" | "error"): void {
-    ChatPanel.currentPanel?.panel.webview.postMessage({
-      command: "addMessage",
-      text,
-      type,
-    });
+    ChatPanel.currentPanel?.panel.webview.postMessage({ command: "addMessage", text, type });
   }
 
-  private async handleMessage(message: { command: string; text?: string }): Promise<void> {
+  private async handle(message: { command: string; text?: string }): Promise<void> {
     if (message.command === "sendMessage" && message.text) {
       await this.sendMessage(message.text);
+    }
+    if (message.command === "insertCode" && message.text) {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) { editor.edit((e) => e.insert(editor.selection.active, message.text!)); }
     }
   }
 
   private async sendMessage(text: string): Promise<void> {
-    // Add user message
     this.panel.webview.postMessage({ command: "addMessage", text, type: "user" });
-
     try {
       this.panel.webview.postMessage({ command: "responseStart" });
-      
-      // Use non-streaming chat for reliability
-      const response = await this.apiClient.chat(text);
-      
-      this.panel.webview.postMessage({
-        command: "addMessage",
-        text: response.response,
-        type: "ai",
-      });
-      this.panel.webview.postMessage({ command: "responseDone" });
+      const r = await this.apiClient.chat(text);
+      this.panel.webview.postMessage({ command: "addMessage", text: r.response, type: "ai" });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Connection failed";
-      let friendly = msg;
-      if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
-        friendly = "Server is not running. Start it from the dashboard: http://localhost:8000";
-      } else if (msg.includes("503") || msg.includes("No AI model")) {
-        friendly = "No AI model loaded. Open the dashboard to download one.";
-      }
-      this.panel.webview.postMessage({
-        command: "addMessage",
-        text: friendly,
-        type: "error",
-      });
+      const msg = error instanceof Error ? error.message : "Failed";
+      this.panel.webview.postMessage({ command: "addMessage", text: msg, type: "error" });
     }
   }
 
-  private getHtml(extensionUri: vscode.Uri): string {
-    const htmlPath = path.join(extensionUri.fsPath, "src", "chat.html");
-    return fs.readFileSync(htmlPath, "utf-8");
+  private getHtml(extUri: vscode.Uri): string {
+    return fs.readFileSync(path.join(extUri.fsPath, "src", "chat.html"), "utf-8");
   }
 
   private dispose(): void {
-    ChatPanel.currentPanel = undefined;
-    this.panel.dispose();
-    while (this.disposables.length) {
-      const d = this.disposables.pop();
-      if (d) d.dispose();
-    }
+    ChatPanel.currentPanel = undefined; this.panel.dispose();
+    while (this.disposables.length) { const d = this.disposables.pop(); if (d) d.dispose(); }
   }
 }
