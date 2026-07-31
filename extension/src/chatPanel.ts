@@ -71,7 +71,11 @@ export class ChatPanel {
     try {
       this.panel.webview.postMessage({ command: "responseStart" });
       const response = await this.apiClient.chat(text);
-      this.panel.webview.postMessage({ command: "responseChunk", text: response });
+      this.panel.webview.postMessage({
+        command: "responseChunk",
+        text: response.response,
+        speed: response.tokens_per_second,
+      });
       this.panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
       this.panel.webview.postMessage({

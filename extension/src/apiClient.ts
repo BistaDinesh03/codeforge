@@ -1,8 +1,3 @@
-/**
- * API Client for CodeForge server communication.
- * Handles all HTTP requests with retry, timeout, and error handling.
- */
-
 export interface ServerConfig {
   serverUrl: string;
   maxTokens: number;
@@ -15,6 +10,13 @@ const DEFAULT_CONFIG: ServerConfig = {
   temperature: 0.7,
 };
 
+export interface ChatResponse {
+  response: string;
+  tokens_generated: number;
+  tokens_per_second: number;
+  model_used: string;
+}
+
 export class ApiClient {
   private config: ServerConfig;
 
@@ -26,87 +28,90 @@ export class ApiClient {
     this.config = { ...this.config, ...config };
   }
 
-  /** Check if server is reachable */
-  async healthCheck(): Promise<boolean> {
-    try {
-      const response = await this.fetchWithTimeout(
-        `${this.config.serverUrl}/health`,
-        { timeout: 5000 }
-      );
-      const data = await response.json() as { status: string };
-      return data.status === "healthy";
-    } catch {
-      return false;
-    }
+  get serverUrl(): string {
+    return this.config.serverUrl;
   }
 
-  /** Get server version */
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await this.fetchWithTimeout(`${this.config.serverUrl}/health`, { timeout: 5000 });
+      const data = await response.json() as { status: string };
+      return data.status === "healthy";
+    } catch { return false; }
+  }
+
   async getVersion(): Promise<string> {
-    const response = await this.fetchWithTimeout(
-      `${this.config.serverUrl}/version`
-    );
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/version`);
     const data = await response.json() as { version: string };
     return data.version;
   }
 
-  /** Send chat message */
-  async chat(message: string, signal?: AbortSignal): Promise<string> {
-    const response = await this.fetchWithTimeout(
-      `${this.config.serverUrl}/chat`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          max_tokens: this.config.maxTokens,
-          temperature: this.config.temperature,
-        }),
-        signal,
-      }
-    );
-
+  async chat(message: string, signal?: AbortSignal): Promise<ChatResponse> {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature,
+      }),
+      signal,
+    });
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Server error ${response.status}: ${err}`);
     }
-
-    const data = await response.json() as { response: string };
-    return data.response;
+    return response.json() as Promise<ChatResponse>;
   }
 
-  /** Explain code */
-  async explainCode(code: string, language: string, signal?: AbortSignal): Promise<string> {
-    const message = `Explain this ${language} code:\n\`\`\`${language}\n${code}\n\`\`\``;
-    return this.chat(message, signal);
+  async explainCode(code: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/explain?language=${language}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, language }),
+      signal,
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Server error ${response.status}: ${err}`);
+    }
+    return response.json() as Promise<ChatResponse>;
   }
 
-  /** Generate code from description */
-  async generateCode(description: string, language: string, signal?: AbortSignal): Promise<string> {
-    const message = `Write ${language} code that: ${description}\nReturn only the code.`;
-    return this.chat(message, signal);
+  async generateCode(description: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/generate?language=${language}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description, language }),
+      signal,
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Server error ${response.status}: ${err}`);
+    }
+    return response.json() as Promise<ChatResponse>;
   }
 
-  /** Rewrite/improve code */
-  async rewriteCode(code: string, language: string, signal?: AbortSignal): Promise<string> {
-    const message = `Rewrite this ${language} code to be cleaner and follow best practices:\n\`\`\`${language}\n${code}\n\`\`\`\nReturn only the improved code.`;
-    return this.chat(message, signal);
+  async rewriteCode(code: string, language: string, signal?: AbortSignal): Promise<ChatResponse> {
+    const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat/rewrite?language=${language}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, language }),
+      signal,
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Server error ${response.status}: ${err}`);
+    }
+    return response.json() as Promise<ChatResponse>;
   }
 
-  /** Fetch with timeout */
-  private async fetchWithTimeout(
-    url: string,
-    options: RequestInit & { timeout?: number } = {}
-  ): Promise<Response> {
+  private async fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
     const { timeout = 30000, ...fetchOptions } = options;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
-
     try {
-      const response = await fetch(url, {
-        ...fetchOptions,
-        signal: fetchOptions.signal || controller.signal,
-      });
-      return response;
+      return await fetch(url, { ...fetchOptions, signal: fetchOptions.signal || controller.signal });
     } finally {
       clearTimeout(id);
     }

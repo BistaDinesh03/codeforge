@@ -12,6 +12,7 @@ from app.core.logging_config import setup_logging, get_logger
 from app.api.health import router as health_router
 from app.api.models import router as models_router
 from app.api.project import router as project_router
+from app.api.chat import router as chat_router
 from app.services.discovery import get_discovery_service
 
 setup_logging()
@@ -24,7 +25,6 @@ app = FastAPI(
     description="Private AI coding server. Runs on any computer, connects to VS Code.",
     version=settings.APP_VERSION,
     docs_url="/docs" if settings.DEBUG else None,
-    redoc_url=None,
 )
 
 app.add_middleware(
@@ -38,6 +38,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(models_router)
 app.include_router(project_router)
+app.include_router(chat_router)
 
 
 @app.exception_handler(Exception)
@@ -61,14 +62,13 @@ async def root():
             "version": "/version",
             "models": "/models",
             "project": "/project",
-            "docs": "/docs" if settings.DEBUG else "disabled",
+            "chat": "/chat",
         },
     }
 
 
 @app.on_event("startup")
 async def startup():
-    # Start network discovery
     discovery = get_discovery_service()
     discovery.start()
     logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
