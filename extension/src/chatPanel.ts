@@ -84,17 +84,16 @@ export class ChatPanel {
       this.panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Connection failed";
-      if (msg.includes("503") || msg.includes("No AI model")) {
-        this.panel.webview.postMessage({
-          command: "responseError",
-          error: "Loading AI model... Please wait and try again.",
-        });
-      } else {
-        this.panel.webview.postMessage({
-          command: "responseError",
-          error: msg,
-        });
+      let friendly = msg;
+      if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+        friendly = "Server is not running. Start it from the dashboard: http://localhost:8000";
+      } else if (msg.includes("503") || msg.includes("No AI model")) {
+        friendly = "No AI model loaded. Open the dashboard to download one: http://localhost:8000";
       }
+      this.panel.webview.postMessage({
+        command: "responseError",
+        error: friendly,
+      });
     }
   }
 
