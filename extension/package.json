@@ -1,0 +1,118 @@
+{
+  "name": "codeforge",
+  "displayName": "CodeForge - Private AI Coding Assistant",
+  "description": "Self-hosted AI coding assistant. Runs on your own computer, complete privacy.",
+  "version": "0.1.0",
+  "publisher": "codeforge",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "coding",
+    "assistant",
+    "private",
+    "self-hosted",
+    "llama",
+    "copilot"
+  ],
+  "icon": "icon.png",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "CodeForge",
+      "properties": {
+        "codeforge.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "URL of your CodeForge server"
+        },
+        "codeforge.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect to server on startup"
+        },
+        "codeforge.modelName": {
+          "type": "string",
+          "default": "",
+          "description": "Model to use (empty = auto-detect)"
+        },
+        "codeforge.maxTokens": {
+          "type": "number",
+          "default": 2048,
+          "description": "Maximum tokens per response"
+        },
+        "codeforge.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Creativity level (0=precise, 1=creative)"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "codeforge.openChat",
+        "title": "CodeForge: Open Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "codeforge.explainCode",
+        "title": "CodeForge: Explain This Code"
+      },
+      {
+        "command": "codeforge.generateCode",
+        "title": "CodeForge: Generate Code From Comment"
+      },
+      {
+        "command": "codeforge.rewriteCode",
+        "title": "CodeForge: Rewrite This Code"
+      },
+      {
+        "command": "codeforge.reconnect",
+        "title": "CodeForge: Reconnect to Server"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeforge.explainCode",
+          "when": "editorHasSelection",
+          "group": "codeforge@1"
+        },
+        {
+          "command": "codeforge.rewriteCode",
+          "when": "editorHasSelection",
+          "group": "codeforge@2"
+        },
+        {
+          "command": "codeforge.generateCode",
+          "group": "codeforge@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "test": "jest --passWithNoTests"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^18.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  }
+}
