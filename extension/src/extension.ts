@@ -5,6 +5,7 @@ import { ChatPanel } from "./chatPanel";
 import { CodeActionProvider } from "./codeActions";
 import { ServerDiscovery } from "./discovery";
 import { InlineCompletionProvider } from "./inlineCompletion";
+import { SettingsPanel } from "./settingsPanel";
 import { showError } from "./errorHandler";
 
 let statusBar: StatusBarManager;
@@ -52,6 +53,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("codeforge.openChat", () => {
       ChatPanel.createOrShow(context.extensionUri, apiClient, statusBar);
     }),
+    vscode.commands.registerCommand("codeforge.openSettings", () => {
+      SettingsPanel.createOrShow(apiClient);
+    }),
     vscode.commands.registerCommand("codeforge.explainCode", () => {
       codeActions.explainCode().catch(showError);
     }),
@@ -71,8 +75,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function connect(): Promise<void> {
   statusBar.setConnected(false);
-
-  // Try current URL first
   const healthy = await apiClient.healthCheck();
   if (healthy) {
     statusBar.setConnected(true);
@@ -81,7 +83,6 @@ async function connect(): Promise<void> {
     return;
   }
 
-  // Try auto-discovery
   try {
     const discovery = new ServerDiscovery();
     const server = await discovery.discover(5000);
@@ -94,11 +95,8 @@ async function connect(): Promise<void> {
       startHealthMonitor();
       return;
     }
-  } catch {
-    // Discovery failed, will retry
-  }
+  } catch { }
 
-  // Retry with backoff
   retryCount++;
   if (retryCount <= MAX_RETRIES) {
     const delay = Math.min(2000 * Math.pow(2, retryCount - 1), 30000);
@@ -120,14 +118,11 @@ function startHealthMonitor(): void {
     } else {
       statusBar.setConnected(true);
     }
-  }, 15000); // Check every 15 seconds
+  }, 15000);
 }
 
 function stopReconnectTimer(): void {
-  if (reconnectTimer) {
-    clearInterval(reconnectTimer);
-    reconnectTimer = undefined;
-  }
+  if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = undefined; }
 }
 
 export function deactivate(): void {

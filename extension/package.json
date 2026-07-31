@@ -13,15 +13,8 @@
     "Other"
   ],
   "keywords": [
-    "ai",
-    "coding",
-    "assistant",
-    "private",
-    "self-hosted",
-    "llama",
-    "copilot"
+    "ai", "coding", "assistant", "private", "self-hosted", "llama", "copilot"
   ],
-  "icon": "icon.png",
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -62,8 +55,11 @@
     "commands": [
       {
         "command": "codeforge.openChat",
-        "title": "CodeForge: Open Chat",
-        "icon": "$(comment-discussion)"
+        "title": "CodeForge: Open Chat"
+      },
+      {
+        "command": "codeforge.openSettings",
+        "title": "CodeForge: Open Settings"
       },
       {
         "command": "codeforge.explainCode",
