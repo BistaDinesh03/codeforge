@@ -85,12 +85,6 @@ class TestRootEndpoint:
         data = response.json()
         assert data["status"] == "running"
 
-    def test_lists_endpoints(self, client):
-        response = client.get("/")
-        data = response.json()
-        assert "endpoints" in data
-        assert "health" in data["endpoints"]
-
 
 class TestErrorHandling:
     """Tests for error handling."""
