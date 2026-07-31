@@ -46,6 +46,20 @@ export class ApiClient {
     return data.version;
   }
 
+  async autoLoadModel(): Promise<boolean> {
+    try {
+      const response = await this.fetchWithTimeout(`${this.config.serverUrl}/models/auto-load`, {
+        method: "POST",
+        timeout: 60000,
+      });
+      if (!response.ok) return false;
+      const data = await response.json() as { status: string };
+      return data.status === "loaded";
+    } catch {
+      return false;
+    }
+  }
+
   async chat(message: string, signal?: AbortSignal): Promise<ChatResponse> {
     const response = await this.fetchWithTimeout(`${this.config.serverUrl}/chat`, {
       method: "POST",
@@ -57,6 +71,28 @@ export class ApiClient {
       }),
       signal,
     });
+
+    if (response.status === 503) {
+      const loaded = await this.autoLoadModel();
+      if (loaded) {
+        const retryResponse = await this.fetchWithTimeout(`${this.config.serverUrl}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            max_tokens: this.config.maxTokens,
+            temperature: this.config.temperature,
+          }),
+          signal,
+        });
+        if (!retryResponse.ok) {
+          const err = await retryResponse.text();
+          throw new Error(`Server error ${retryResponse.status}: ${err}`);
+        }
+        return retryResponse.json() as Promise<ChatResponse>;
+      }
+    }
+
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Server error ${response.status}: ${err}`);

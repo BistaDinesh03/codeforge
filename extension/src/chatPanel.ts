@@ -83,10 +83,18 @@ export class ChatPanel {
 
       this.panel.webview.postMessage({ command: "responseDone" });
     } catch (error) {
-      this.panel.webview.postMessage({
-        command: "responseError",
-        error: error instanceof Error ? error.message : "Connection failed",
-      });
+      const msg = error instanceof Error ? error.message : "Connection failed";
+      if (msg.includes("503") || msg.includes("No AI model")) {
+        this.panel.webview.postMessage({
+          command: "responseError",
+          error: "Loading AI model... Please wait and try again.",
+        });
+      } else {
+        this.panel.webview.postMessage({
+          command: "responseError",
+          error: msg,
+        });
+      }
     }
   }
 
