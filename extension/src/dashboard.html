@@ -2,29 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'unsafe-inline' https://cdnjs.cloudflare.com;">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:var(--vscode-font-family);font-size:13px;background:var(--vscode-editor-background,#1e1e1e);color:var(--vscode-editor-foreground,#d4d4d4);height:100vh;overflow-y:auto;padding:20px}
-        h2{font-size:16px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#3c3c3c)}
-        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:20px}
-        .card{background:var(--vscode-input-background,#2d2d2d);border:1px solid var(--vscode-panel-border,#404040);border-radius:6px;padding:14px}
-        .card .lbl{font-size:10px;text-transform:uppercase;color:var(--vscode-descriptionForeground,#999);letter-spacing:.5px;margin-bottom:4px}
-        .card .val{font-size:22px;font-weight:600}.card .sub{font-size:11px;color:var(--vscode-descriptionForeground,#999);margin-top:2px}
+        h2{font-size:15px;margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#3c3c3c)}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:16px}
+        .card{background:var(--vscode-input-background,#2d2d2d);border:1px solid var(--vscode-panel-border,#404040);border-radius:6px;padding:12px}
+        .card .lbl{font-size:10px;text-transform:uppercase;color:var(--vscode-descriptionForeground,#999);letter-spacing:.4px;margin-bottom:3px}
+        .card .val{font-size:20px;font-weight:600}.card .sub{font-size:11px;color:var(--vscode-descriptionForeground,#999);margin-top:2px}
         .g{color:#3fb950}.y{color:#d29922}.r{color:#f85149}
-        .risk-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.06);font-size:12px}
-        .risk-item .sev{font-size:10px;padding:2px 6px;border-radius:8px}.sev.high{background:rgba(248,81,73,.15);color:#f85149}.sev.medium{background:rgba(210,153,34,.15);color:#d29922}
-        .persona{border-left:3px solid var(--vscode-focusBorder,#1f6feb);padding:12px;margin:8px 0;background:var(--vscode-input-background,#2d2d2d);border-radius:0 6px 6px 0}
-        .persona .name{font-weight:600;font-size:13px}.persona .greet{font-size:12px;margin:4px 0;line-height:1.5;color:var(--vscode-descriptionForeground,#ccc)}
-        .persona .meta{font-size:10px;color:var(--vscode-descriptionForeground,#999);margin-top:6px}
-        .badge{font-size:10px;padding:2px 8px;background:var(--vscode-badge-background,#4d4d4d);color:var(--vscode-badge-foreground,#fff);border-radius:8px;margin-right:4px}
+        .risk-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(128,128,128,.05);font-size:12px}
+        .sev{font-size:10px;padding:2px 6px;border-radius:8px}.sev.high{background:rgba(248,81,73,.15);color:#f85149}.sev.medium{background:rgba(210,153,34,.15);color:#d29922}
+        .persona{border-left:3px solid var(--vscode-focusBorder,#1f6feb);padding:10px 12px;margin:6px 0;background:var(--vscode-input-background,#2d2d2d);border-radius:0 6px 6px 0}
+        .persona .name{font-weight:600;font-size:12px}.persona .greet{font-size:11px;margin:4px 0;line-height:1.5;color:var(--vscode-descriptionForeground,#ccc)}
+        .badge{font-size:10px;padding:1px 6px;background:var(--vscode-badge-background,#4d4d4d);color:var(--vscode-badge-foreground,#fff);border-radius:8px;margin-right:4px}
         .btn{padding:6px 14px;font-size:11px;background:var(--vscode-button-background,#0e639c);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;margin-top:10px}
         .btn:hover{background:var(--vscode-button-hoverBackground,#1177bb)}
+        .folder{background:var(--vscode-input-background,#2d2d2d);border:1px solid var(--vscode-panel-border,#404040);border-radius:4px;padding:8px 12px;margin:4px 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+        .folder:hover{background:var(--vscode-list-hoverBackground,#2a2d2e)}
+        .folder .name{font-weight:500;font-size:12px}
+        .folder .count{font-size:10px;color:var(--vscode-descriptionForeground,#999)}
         .empty{text-align:center;padding:60px;color:var(--vscode-descriptionForeground,#999)}
         .empty h3{font-size:16px;color:var(--vscode-editor-foreground,#d4d4d4);margin-bottom:8px}
-        .empty button{margin-top:12px}
+        .tabs{display:flex;gap:0;margin-bottom:14px}
+        .tab{padding:6px 14px;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;color:var(--vscode-descriptionForeground,#999)}
+        .tab:hover{color:var(--vscode-editor-foreground,#d4d4d4)}
+        .tab.active{color:var(--vscode-editor-foreground,#fff);border-bottom-color:var(--vscode-focusBorder,#1f6feb)}
     </style>
 </head>
 <body>
@@ -32,80 +36,94 @@
         <div class="empty" id="empty">
             <h3>CodeTalk</h3>
             <p>If your code could talk, what would it say?</p>
-            <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze Project</button>
+            <button class="btn" onclick="analyze()">Analyze Project</button>
         </div>
         <div id="dashboard" style="display:none">
-            <h2>Project Health</h2>
-            <div class="grid" id="healthGrid"></div>
-            <h2>Top Risks</h2>
-            <div id="risks"></div>
-            <h2>File Personalities</h2>
-            <div id="personalities"></div>
-            <h2>Awards</h2>
-            <div id="awards"></div>
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('health')">Health</div>
+                <div class="tab" onclick="showTab('personalities')">Personalities</div>
+                <div class="tab" onclick="showTab('map')">Code Map</div>
+                <div class="tab" onclick="showTab('awards')">Awards</div>
+            </div>
+            <div id="tabContent"></div>
         </div>
     </div>
     <script>
         var vscode = acquireVsCodeApi();
         var empty = document.getElementById('empty');
         var dashboard = document.getElementById('dashboard');
+        var tabContent = document.getElementById('tabContent');
+        var allData = null;
+        var currentTab = 'health';
 
         function analyze() {
             empty.style.display = 'none';
             dashboard.style.display = 'block';
-            dashboard.innerHTML = '<p style="color:var(--vscode-descriptionForeground,#999)">Analyzing project...</p>';
+            tabContent.innerHTML = '<p style="color:var(--vscode-descriptionForeground,#999)">Analyzing...</p>';
             vscode.postMessage({command:'analyze'});
         }
 
-        window.addEventListener('message', function(e) {
-            var d = e.data;
-            if (d.command === 'analysis') renderDashboard(d.data);
-        });
-
-        function renderDashboard(data) {
-            var h = '';
-            // Health scores
-            var health = data.health || {};
-            h += '<h2>Project Health</h2><div class="grid">';
-            [
-                {k:'architecture',l:'Architecture'},{k:'maintainability',l:'Maintainability'},
-                {k:'complexity',l:'Complexity'},{k:'documentation',l:'Documentation'},
-                {k:'testing',l:'Testing'},{k:'security',l:'Security'},{k:'overall',l:'Overall'}
-            ].forEach(function(s){
-                var v = health[s.k] || 0;
-                var c = v >= 80 ? 'g' : v >= 60 ? 'y' : 'r';
-                var t = v >= 80 ? 'Good' : v >= 60 ? 'Okay' : 'Needs work';
-                h += '<div class="card"><div class="lbl">'+s.l+'</div><div class="val '+c+'">'+v+'/100</div><div class="sub '+c+'">'+t+'</div></div>';
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(function(t,i){
+                t.classList.toggle('active', t.textContent.toLowerCase().includes(tab) || (tab==='health'&&i===0)||(tab==='personalities'&&i===1)||(tab==='map'&&i===2)||(tab==='awards'&&i===3));
             });
-            h += '</div>';
-
-            // Risks
-            if (data.risks && data.risks.length > 0) {
-                h += '<h2>Top Risks</h2>';
-                data.risks.forEach(function(r){
-                    h += '<div class="risk-item"><span class="sev '+r.severity+'">'+r.severity.toUpperCase()+'</span><span>'+r.detail+' <span class="badge">'+r.file+'</span></span></div>';
-                });
-            }
-
-            // Personalities
-            if (data.personalities && data.personalities.length > 0) {
-                h += '<h2>File Personalities</h2>';
-                data.personalities.forEach(function(p){
-                    h += '<div class="persona"><div class="name">'+p.personality+'</div><div class="greet">'+p.greeting+'</div><div class="meta"><span class="badge">'+p.file+'</span> '+p.metrics.lines+' lines | '+p.metrics.functions+' functions | '+p.metrics.todos+' TODOs</div></div>';
-                });
-            }
-
-            // Awards
-            if (data.awards && data.awards.length > 0) {
-                h += '<h2>Awards</h2>';
-                data.awards.forEach(function(a){
-                    h += '<div class="card" style="margin:6px 0"><div class="val" style="font-size:14px">'+a.award+'</div><div class="sub">'+a.detail+'</div></div>';
-                });
-            }
-
-            h += '<p style="margin-top:10px;font-size:11px;color:var(--vscode-descriptionForeground,#999)">'+data.files+' files | '+data.total_lines+' lines | '+data.total_functions+' functions</p>';
-            dashboard.innerHTML = h;
+            if (allData) renderTab();
         }
+
+        function renderTab() {
+            var d = allData, h = '';
+            if (currentTab === 'health') h = renderHealth(d);
+            else if (currentTab === 'personalities') h = renderPersonalities(d);
+            else if (currentTab === 'map') h = renderMap(d);
+            else if (currentTab === 'awards') h = renderAwards(d);
+            tabContent.innerHTML = h;
+        }
+
+        function renderHealth(d) {
+            var h = '<h2>Project Health</h2><div class="grid">';
+            var health = d.health || {};
+            [{k:'architecture',l:'Architecture'},{k:'maintainability',l:'Maintainability'},{k:'complexity',l:'Complexity'},{k:'documentation',l:'Documentation'},{k:'testing',l:'Testing'},{k:'security',l:'Security'},{k:'overall',l:'Overall'}].forEach(function(s){
+                var v = health[s.k]||0, c = v>=80?'g':v>=60?'y':'r', t = v>=80?'Good':v>=60?'Okay':'Needs work';
+                h+='<div class="card"><div class="lbl">'+s.l+'</div><div class="val '+c+'">'+v+'/100</div><div class="sub '+c+'">'+t+'</div></div>';
+            });
+            h+='</div>';
+            if (d.risks && d.risks.length>0) {
+                h+='<h2>Risks</h2>';
+                d.risks.forEach(function(r){h+='<div class="risk-item"><span class="sev '+r.severity+'">'+r.severity.toUpperCase()+'</span>'+r.detail+' <span class="badge">'+r.file+'</span></div>'});
+            }
+            h+='<p style="font-size:11px;color:var(--vscode-descriptionForeground,#999);margin-top:10px">'+d.files+' files | '+d.total_lines+' lines | '+d.total_functions+' functions</p>';
+            return h;
+        }
+
+        function renderPersonalities(d) {
+            var h = '<h2>File Personalities</h2>';
+            if (d.personalities) d.personalities.forEach(function(p){
+                h+='<div class="persona"><div class="name">'+p.personality+'</div><div class="greet">'+p.greeting+'</div><div class="meta"><span class="badge">'+p.file+'</span> '+p.metrics.lines+' lines | '+p.metrics.functions+' funcs | '+p.metrics.todos+' TODOs</div></div>';
+            });
+            return h;
+        }
+
+        function renderMap(d) {
+            var h = '<h2>Code Map</h2>';
+            if (d.map && d.map.folders) {
+                d.map.folders.forEach(function(f){
+                    h+='<div class="folder"><span class="name">'+f.name+'/</span><span class="count">'+f.count+' files</span></div>';
+                });
+            }
+            h+='<p style="font-size:11px;color:var(--vscode-descriptionForeground,#999);margin-top:6px">'+d.files+' total files</p>';
+            return h;
+        }
+
+        function renderAwards(d) {
+            var h = '<h2>Awards</h2>';
+            if (d.awards) d.awards.forEach(function(a){h+='<div class="card" style="margin:4px 0"><div class="val" style="font-size:13px">'+a.award+'</div><div class="sub">'+a.detail+'</div></div>'});
+            return h;
+        }
+
+        window.addEventListener('message', function(e) {
+            if (e.data.command === 'analysis') { allData = e.data.data; renderTab(); }
+        });
     </script>
 </body>
 </html>

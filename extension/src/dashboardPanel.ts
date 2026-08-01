@@ -26,12 +26,13 @@ export class DashboardPanel {
       const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!ws) { this.panel.webview.postMessage({command:"analysis",data:{error:"No workspace open"}}); return; }
       try {
-        const h = await (this.apiClient as any).fetchJson("/insights/health", {workspace_path: ws});
-        const p = await (this.apiClient as any).fetchJson("/insights/personalities", {workspace_path: ws});
-        const a = await (this.apiClient as any).fetchJson("/insights/awards", {workspace_path: ws});
-        this.panel.webview.postMessage({command:"analysis",data:{...h, personalities:p, awards:a.awards}});
+        const h = await this.apiClient.fetchJson("/insights/health", {workspace_path: ws});
+        const p = await this.apiClient.fetchJson("/insights/personalities", {workspace_path: ws});
+        const a = await this.apiClient.fetchJson("/insights/awards", {workspace_path: ws});
+        const m = await this.apiClient.fetchJson("/insights/map", {workspace_path: ws});
+        this.panel.webview.postMessage({command:"analysis",data:{...h, personalities:p, awards:a.awards, map:m}});
       } catch(e) {
-        this.panel.webview.postMessage({command:"analysis",data:{error:"Failed to analyze. Is the server running?"}});
+        this.panel.webview.postMessage({command:"analysis",data:{error:"Failed. Is the server running?"}});
       }
     }
   }
