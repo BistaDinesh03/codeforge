@@ -1,10 +1,14 @@
 """
-Agent API - planning and execution endpoints.
+Agent API - planning, execution, and status endpoints.
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.planner import create_plan, format_plan_for_display
+from app.services.executor import (
+    start_execution, execute_next_step, get_execution_status,
+    pause_execution, resume_execution,
+)
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -16,63 +20,64 @@ class PlanRequest(BaseModel):
     workspace_path: str
 
 
-class PlanResponse(BaseModel):
-    goal: str
-    summary: str
-    risk_level: str
-    affected_files: list[str]
-    estimated_steps: int
+class ExecuteRequest(BaseModel):
+    plan_id: str
     steps: list[dict]
-    formatted_plan: str
+    workspace_path: str
+    goal: str
 
 
-# Store plans in memory (in production, use a database)
 _plans: dict[str, dict] = {}
 
 
-@router.post("/plan", response_model=PlanResponse)
+@router.post("/plan")
 async def plan(request: PlanRequest):
-    """Create an execution plan for a goal."""
     if not request.goal.strip():
         raise HTTPException(status_code=400, detail="Goal cannot be empty")
-    
     try:
         plan = create_plan(request.goal, request.workspace_path)
-        
-        # Store plan
         plan_id = str(len(_plans) + 1)
-        _plans[plan_id] = {
-            "plan": plan,
-            "status": "created",
+        _plans[plan_id] = {"plan": plan, "status": "created"}
+        return {
+            "plan_id": plan_id,
+            "goal": plan.goal,
+            "summary": plan.summary,
+            "risk_level": plan.risk_level,
+            "affected_files": plan.affected_files,
+            "steps": [{"id":s.id,"action":s.action,"file":s.file,"description":s.description,"risk":s.risk} for s in plan.steps],
         }
-        
-        return PlanResponse(
-            goal=plan.goal,
-            summary=plan.summary,
-            risk_level=plan.risk_level,
-            affected_files=plan.affected_files,
-            estimated_steps=plan.estimated_steps,
-            steps=[{
-                "id": s.id,
-                "action": s.action,
-                "file": s.file,
-                "description": s.description,
-                "risk": s.risk,
-            } for s in plan.steps],
-            formatted_plan=format_plan_for_display(plan),
-        )
     except Exception as e:
-        logger.error(f"Plan failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/plans")
-async def list_plans():
-    """List all created plans."""
-    return {
-        "total": len(_plans),
-        "plans": [
-            {"id": pid, "goal": p["plan"].goal, "status": p["status"]}
-            for pid, p in _plans.items()
-        ],
-    }
+@router.post("/execute")
+async def execute(request: ExecuteRequest):
+    try:
+        exec_id = start_execution(request.plan_id, request.steps, request.workspace_path, request.goal)
+        return {"exec_id": exec_id, "status": "started"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/execute/next")
+async def execute_next(exec_id: str):
+    try:
+        step = execute_next_step(exec_id)
+        return {"step": step.step_id, "status": step.status.value, "result": step.result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/status/{exec_id}")
+async def status(exec_id: str):
+    return get_execution_status(exec_id)
+
+
+@router.post("/pause/{exec_id}")
+async def pause(exec_id: str):
+    return pause_execution(exec_id)
+
+
+@router.post("/resume/{exec_id}")
+async def resume(exec_id: str):
+    return resume_execution(exec_id)
