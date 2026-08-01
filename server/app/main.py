@@ -4,8 +4,7 @@ CodeForge Server - Main entry point.
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
-from pathlib import Path
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
@@ -16,6 +15,7 @@ from app.api.chat import router as chat_router
 from app.api.completion import router as completion_router
 from app.api.update import router as update_router
 from app.api.download import router as download_router
+from app.api.workspace import router as workspace_router
 from app.services.discovery import get_discovery_service
 from app.services.updater import check_for_updates
 
@@ -39,6 +39,7 @@ app.include_router(chat_router)
 app.include_router(completion_router)
 app.include_router(update_router)
 app.include_router(download_router)
+app.include_router(workspace_router)
 
 
 @app.exception_handler(Exception)
@@ -50,21 +51,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    """Return dashboard HTML for browsers, JSON for API clients."""
-    accept = request.headers.get("accept", "")
-    
-    if "text/html" in accept:
-        dashboard_path = Path(__file__).parent / "templates" / "dashboard.html"
-        if dashboard_path.exists():
-            return HTMLResponse(dashboard_path.read_text(encoding="utf-8"))
-    
-    return JSONResponse({
+@app.get("/")
+async def root():
+    return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "status": "running",
-    })
+    }
 
 
 @app.on_event("startup")
@@ -72,10 +65,8 @@ async def startup():
     get_discovery_service().start()
     try:
         update = check_for_updates()
-        if update:
-            logger.info(f"Update available: {update.version}")
-    except Exception:
-        pass
+        if update: logger.info(f"Update available: {update.version}")
+    except Exception: pass
     logger.info(f"Server started on {settings.HOST}:{settings.PORT}")
 
 
