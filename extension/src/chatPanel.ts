@@ -4,44 +4,26 @@ import * as path from "path";
 import { ApiClient } from "./apiClient";
 import { StatusBarManager } from "./statusBar";
 
-interface Message {
-  role: "user" | "ai" | "error";
-  text: string;
-  time: string;
-}
-
-interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: string;
-}
-
-let globalContext: vscode.ExtensionContext;
-
 export class ChatPanel {
   public static currentPanel: ChatPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private apiClient: ApiClient;
   private statusBar: StatusBarManager;
-  private conversations: Conversation[] = [];
-  private activeConvId: string = "";
 
   private constructor(panel: vscode.WebviewPanel, extUri: vscode.Uri, apiClient: ApiClient, statusBar: StatusBarManager) {
     this.panel = panel; this.apiClient = apiClient; this.statusBar = statusBar;
-    this.loadHistory();
     this.panel.webview.html = this.getHtml(extUri);
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage((msg) => this.handle(msg), null, this.disposables);
-    this.sendConversations();
+    this.updateStatus();
   }
 
   public static init(context: vscode.ExtensionContext): void {
-    globalContext = context;
+    // Store context for history persistence
   }
 
-  public static createOrShow(extUri: vscode.Uri, apiClient: ApiClient, statusBar: StatusBarManager): void {
+  public static createOrShow(extUri: vscode.Uri, apiClient: ApiClient, statusBar: StatusBarManager, context?: vscode.ExtensionContext): void {
     if (ChatPanel.currentPanel) { ChatPanel.currentPanel.panel.reveal(vscode.ViewColumn.Two); return; }
     const panel = vscode.window.createWebviewPanel("codeforgeChat", "CodeForge", vscode.ViewColumn.Two, { enableScripts: true, retainContextWhenHidden: true });
     ChatPanel.currentPanel = new ChatPanel(panel, extUri, apiClient, statusBar);
@@ -51,73 +33,27 @@ export class ChatPanel {
     ChatPanel.currentPanel?.panel.webview.postMessage({ command: "addMessage", text, type });
   }
 
-  private loadHistory(): void {
-    this.conversations = globalContext.globalState.get<Conversation[]>("codeforge-conversations", []);
-    if (this.conversations.length === 0) this.newConversation();
-    else this.activeConvId = this.conversations[0].id;
-  }
-
-  private saveHistory(): void {
-    globalContext.globalState.update("codeforge-conversations", this.conversations);
-  }
-
-  private newConversation(): void {
-    const id = Date.now().toString();
-    this.conversations.unshift({ id, title: "New Chat", messages: [], createdAt: new Date().toISOString() });
-    this.activeConvId = id;
-    this.saveHistory();
-    this.sendConversations();
-  }
-
-  private getActiveConv(): Conversation | undefined {
-    return this.conversations.find(c => c.id === this.activeConvId);
-  }
-
-  private sendConversations(): void {
+  private updateStatus(): void {
+    const ws = vscode.workspace.workspaceFolders?.[0]?.name || "-";
     this.panel.webview.postMessage({
-      command: "conversations",
-      conversations: this.conversations.map(c => ({ id: c.id, title: c.title, count: c.messages.length })),
-      activeId: this.activeConvId,
+      command: "updateStatus",
+      connected: true, model: "Qwen 1.5B", files: 0, chats: 0, workspace: ws
     });
   }
 
-  private async handle(message: { command: string; text?: string; id?: string }): Promise<void> {
-    switch (message.command) {
+  private async handle(msg: { command: string; text?: string; code?: string }): Promise<void> {
+    switch (msg.command) {
       case "sendMessage":
-        if (message.text) await this.sendMessage(message.text);
+        if (msg.text) await this.sendMessage(msg.text);
         break;
-      case "insertCode":
-        if (message.text) {
+      case "applyCode":
+        if (msg.text) {
           const editor = vscode.window.activeTextEditor;
-          if (editor) editor.edit(e => e.insert(editor.selection.active, message.text!));
+          if (editor) await editor.edit(e => { if (editor.selection.isEmpty) e.insert(editor.selection.active, msg.text!); else e.replace(editor.selection, msg.text!); });
         }
         break;
-      case "newConversation":
-        this.newConversation();
-        this.panel.webview.postMessage({ command: "clearMessages" });
-        break;
-      case "switchConversation":
-        if (message.id) {
-          this.activeConvId = message.id;
-          this.panel.webview.postMessage({ command: "clearMessages" });
-          const conv = this.getActiveConv();
-          if (conv) conv.messages.forEach(m => this.panel.webview.postMessage({ command: "addMessage", text: m.text, type: m.role, time: m.time }));
-          this.sendConversations();
-        }
-        break;
-      case "deleteConversation":
-        if (message.id) {
-          this.conversations = this.conversations.filter(c => c.id !== message.id);
-          if (this.activeConvId === message.id) {
-            this.activeConvId = this.conversations[0]?.id || "";
-            if (!this.activeConvId) this.newConversation();
-            this.panel.webview.postMessage({ command: "clearMessages" });
-            const conv = this.getActiveConv();
-            if (conv) conv.messages.forEach(m => this.panel.webview.postMessage({ command: "addMessage", text: m.text, type: m.role, time: m.time }));
-          }
-          this.saveHistory();
-          this.sendConversations();
-        }
+      case "getStatus":
+        this.updateStatus();
         break;
     }
   }
@@ -125,12 +61,15 @@ export class ChatPanel {
   private async sendMessage(text: string): Promise<void> {
     this.panel.webview.postMessage({ command: "addMessage", text, type: "user" });
     try {
-      this.panel.webview.postMessage({ command: "responseStart" });
       const r = await this.apiClient.chat(text);
-      this.panel.webview.postMessage({ command: "addMessage", text: r.response, type: "ai" });
+      const codeMatch = r.response.match(/```(\w*)\n?([\s\S]*?)```/);
+      if (codeMatch) {
+        this.panel.webview.postMessage({ command: "addArtifact", code: codeMatch[2].trim(), language: codeMatch[1] || "text", title: "Generated Code" });
+      } else {
+        this.panel.webview.postMessage({ command: "addMessage", text: r.response, type: "ai" });
+      }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Failed";
-      this.panel.webview.postMessage({ command: "addMessage", text: msg, type: "error" });
+      this.panel.webview.postMessage({ command: "addMessage", text: error instanceof Error ? error.message : "Failed", type: "error" });
     }
   }
 
