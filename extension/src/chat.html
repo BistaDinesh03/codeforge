@@ -7,196 +7,60 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:var(--vscode-font-family);font-size:13px;background:var(--vscode-editor-background,#1e1e1e);color:var(--vscode-editor-foreground,#d4d4d4);height:100vh;display:flex;flex-direction:column;overflow:hidden}
-        .statusbar{display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--vscode-statusBar-background,#007acc);color:var(--vscode-statusBar-foreground,#fff);font-size:11px;height:26px;flex-shrink:0}
-        .dot{width:7px;height:7px;border-radius:50%}.dot.on{background:#4ec944}.dot.off{background:#f85149}
-        .spacer{flex:1}
-        .content{flex:1;overflow-y:auto}
-        
-        /* Dashboard */
-        .dash{padding:16px}.dash h3{font-size:14px;margin-bottom:10px}
-        .cards{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-        .card{flex:1;min-width:130px;padding:10px 14px;background:var(--vscode-input-background,#2d2d2d);border:1px solid var(--vscode-panel-border,#404040);border-radius:6px}
-        .card .lbl{font-size:10px;text-transform:uppercase;color:var(--vscode-descriptionForeground,#999);margin-bottom:3px;letter-spacing:.5px}
-        .card .val{font-size:14px;font-weight:500}.card .val.green{color:#4ec944}.card .val.yellow{color:#d29922}
-        .acts{display:flex;gap:6px;flex-wrap:wrap}.acts button{padding:5px 12px;font-size:11px;background:var(--vscode-button-secondaryBackground,#3c3c3c);color:var(--vscode-editor-foreground,#d4d4d4);border:1px solid var(--vscode-panel-border,#555);border-radius:4px;cursor:pointer}.acts button:hover{background:var(--vscode-button-secondaryHoverBackground,#4d4d4d)}
-
-        /* Messages */
-        .msg{border-bottom:1px solid rgba(128,128,128,.06)}
-        .msg.user{padding:8px 16px;font-size:12px;color:var(--vscode-descriptionForeground,#999)}
-        .msg.user .q{color:var(--vscode-editor-foreground,#d4d4d4);font-weight:500}
-        .msg.error{padding:10px 16px;background:rgba(248,81,73,.08);color:#f99}
-        .sec-hdr{padding:7px 16px;font-size:10px;font-weight:600;text-transform:uppercase;color:var(--vscode-descriptionForeground,#999);cursor:pointer;display:flex;justify-content:space-between;letter-spacing:.5px;user-select:none}
-        .sec-hdr:hover{background:rgba(255,255,255,.02)}
-        .sec-body{padding:0 16px 8px}.sec-body.hidden{display:none}
-        .text{padding:10px 16px;line-height:1.6}
-        .cb{border:1px solid var(--vscode-panel-border,#404040);border-left:3px solid var(--vscode-focusBorder,#1f6feb);border-radius:4px;overflow:hidden;margin:6px 0}
-        .cb-bar{display:flex;justify-content:space-between;padding:4px 10px;background:rgba(255,255,255,.03);font-size:10px;color:var(--vscode-descriptionForeground,#999)}
-        .cb-bar button{padding:2px 8px;font-size:10px;background:transparent;color:var(--vscode-descriptionForeground,#999);border:1px solid var(--vscode-panel-border,#555);border-radius:3px;cursor:pointer}
-        .cb-bar button:hover{color:#fff;background:rgba(255,255,255,.05)}
-        .cb pre{margin:0;padding:12px;overflow-x:auto;background:var(--vscode-textCodeBlock-background,#1a1a1a)}
-        .cb code{font-family:var(--vscode-editor-font-family,monospace);font-size:12px;line-height:1.5}
-        .acts-row{display:flex;gap:5px;padding:6px 16px 10px;flex-wrap:wrap}
-        .acts-row button{padding:5px 12px;font-size:11px;background:var(--vscode-button-secondaryBackground,#3c3c3c);color:var(--vscode-editor-foreground,#d4d4d4);border:1px solid var(--vscode-panel-border,#555);border-radius:4px;cursor:pointer}
-        .acts-row button:hover{background:var(--vscode-button-secondaryHoverBackground,#4d4d4d)}
-        .acts-row button.pri{background:var(--vscode-button-background,#0e639c);color:#fff;border:none}
-        .acts-row button.pri:hover{background:var(--vscode-button-hoverBackground,#1177bb)}
-        .acts-row button.danger{background:#da3633;color:#fff;border:none}
-
-        /* Plan steps */
-        .step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px}
-        .step .icon{width:22px;text-align:center;flex-shrink:0}
-        .step .status{font-size:10px;padding:2px 8px;border-radius:10px}
-        .step .status.pending{background:rgba(255,255,255,.05);color:var(--vscode-descriptionForeground,#999)}
-        .step .status.running{background:rgba(31,111,235,.2);color:#58a6ff}
-        .step .status.complete{background:rgba(46,160,67,.2);color:#3fb950}
-        .step .status.failed{background:rgba(248,81,73,.2);color:#f85149}
-
-        /* Input */
-        .input-wrap{display:flex;align-items:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--vscode-panel-border,#3c3c3c);flex-shrink:0;background:var(--vscode-editor-background,#1e1e1e);position:relative}
-        .input-wrap textarea{flex:1;padding:8px 12px;background:var(--vscode-input-background,#2d2d2d);color:var(--vscode-input-foreground,#fff);border:1px solid var(--vscode-input-border,#555);border-radius:6px;resize:none;font-family:inherit;font-size:13px;line-height:1.4;min-height:34px;max-height:120px}
-        .input-wrap textarea:focus{outline:none;border-color:var(--vscode-focusBorder,#1f6feb)}
-        .input-wrap textarea::placeholder{color:var(--vscode-descriptionForeground,#999)}
-        .send-btn{padding:8px 16px;background:var(--vscode-button-background,#0e639c);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;height:34px;white-space:nowrap}
-        .send-btn:hover{background:var(--vscode-button-hoverBackground,#1177bb)}.send-btn:disabled{opacity:.4}
-
-        /* Command menu */
-        .cmd-menu{position:absolute;bottom:calc(100% + 6px);left:14px;right:14px;background:var(--vscode-input-background,#252526);border:1px solid var(--vscode-panel-border,#404040);border-radius:6px;max-height:200px;overflow-y:auto;display:none;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-        .cmd-item{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
-        .cmd-item:hover,.cmd-item.active{background:rgba(255,255,255,.05)}
-        .cmd-item .ico{width:22px;text-align:center}.cmd-item .cmd{font-weight:600}.cmd-item .dsc{font-size:11px;color:var(--vscode-descriptionForeground,#999);margin-left:auto}
-        .progress{padding:6px 16px;font-size:11px;color:var(--vscode-descriptionForeground,#999);animation:pulse 1.5s infinite}@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+        body{font-family:var(--vscode-font-family);font-size:13px;background:var(--vscode-editor-background,#1e1e1e);color:var(--vscode-editor-foreground,#d4d4d4);height:100vh;display:flex;flex-direction:column}
+        .bar{display:flex;align-items:center;gap:8px;padding:0 12px;height:24px;background:var(--vscode-statusBar-background,#007acc);color:#fff;font-size:11px;flex-shrink:0}
+        .dot{width:6px;height:6px;border-radius:50%}.dot.on{background:#4ec944}.dot.off{background:#f85149}
+        .msgs{flex:1;overflow-y:auto;padding:8px 0}
+        .msg{padding:6px 14px;font-size:12px;line-height:1.5;border-bottom:1px solid rgba(128,128,128,0.05)}
+        .msg.user{color:var(--vscode-descriptionForeground,#999)}
+        .msg.ai{background:rgba(255,255,255,0.01)}
+        .msg .lbl{font-size:10px;font-weight:600;text-transform:uppercase;margin-bottom:2px;opacity:0.6}
+        .cb{border:1px solid var(--vscode-panel-border,#404040);border-left:3px solid var(--vscode-focusBorder,#1f6feb);border-radius:3px;margin:6px 0;overflow:hidden}
+        .cb-top{display:flex;justify-content:space-between;padding:3px 8px;background:rgba(255,255,255,0.03);font-size:10px;color:var(--vscode-descriptionForeground,#999)}
+        .cb-top button{background:none;border:1px solid var(--vscode-panel-border,#555);color:var(--vscode-descriptionForeground,#999);padding:1px 6px;border-radius:2px;cursor:pointer;font-size:10px}
+        .cb-top button:hover{color:#fff;background:rgba(255,255,255,0.05)}
+        .cb pre{margin:0;padding:10px;overflow-x:auto;background:var(--vscode-textCodeBlock-background,#0d1117)}
+        .cb code{font-family:var(--vscode-editor-font-family,monospace);font-size:12px;line-height:1.4}
+        .acts{display:flex;gap:4px;margin-top:6px}
+        .acts button{padding:3px 10px;font-size:11px;background:var(--vscode-button-secondaryBackground,#3c3c3c);color:var(--vscode-editor-foreground,#d4d4d4);border:1px solid var(--vscode-panel-border,#555);border-radius:3px;cursor:pointer}
+        .acts button:hover{background:var(--vscode-button-secondaryHoverBackground,#4d4d4d)}
+        .acts button.pri{background:var(--vscode-button-background,#0e639c);color:#fff;border:none}
+        .input-w{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--vscode-panel-border,#3c3c3c);flex-shrink:0}
+        .input-w textarea{flex:1;padding:6px 10px;background:var(--vscode-input-background,#2d2d2d);color:var(--vscode-input-foreground,#fff);border:1px solid var(--vscode-input-border,#555);border-radius:4px;resize:none;font-family:inherit;font-size:12px;min-height:28px;max-height:80px}
+        .input-w textarea:focus{outline:none;border-color:var(--vscode-focusBorder,#1f6feb)}
+        .input-w button{padding:6px 14px;background:var(--vscode-button-background,#0e639c);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:12px}
+        .input-w button:disabled{opacity:0.4}
+        .empty{text-align:center;padding:40px;color:var(--vscode-descriptionForeground,#999)}
+        .empty b{color:var(--vscode-editor-foreground,#d4d4d4)}
+        .hint{margin-top:12px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+        .hint span{padding:3px 8px;font-size:10px;background:var(--vscode-input-background,#2d2d2d);border:1px solid var(--vscode-panel-border,#404040);border-radius:10px;cursor:pointer}
+        .hint span:hover{background:var(--vscode-button-background,#0e639c);color:#fff;border-color:#0e639c}
     </style>
 </head>
 <body>
-    <div class="statusbar">
-        <span class="dot on" id="dot"></span><span id="modelName">Qwen 1.5B</span>
-        <span class="spacer"></span><span id="tokenSpeed"></span>
+    <div class="bar"><span class="dot on" id="dot"></span>CodeForge</div>
+    <div class="msgs" id="msgs">
+        <div class="empty" id="empty"><b>CodeForge</b><p style="margin-top:6px">Your private AI coding assistant</p><div class="hint"><span onclick="ask('/explain')">/explain</span><span onclick="ask('/fix')">/fix</span><span onclick="ask('/generate')">/generate</span><span onclick="ask('/test')">/test</span><span onclick="ask('/refactor')">/refactor</span></div></div>
     </div>
-
-    <div class="content" id="content">
-        <div class="dash" id="dash">
-            <h3>CodeForge Agent</h3>
-            <div class="cards">
-                <div class="card"><div class="lbl">Workspace</div><div class="val" id="wsName">-</div></div>
-                <div class="card"><div class="lbl">Model</div><div class="val green">1.5B</div></div>
-                <div class="card"><div class="lbl">Status</div><div class="val green">Ready</div></div>
-            </div>
-            <div class="acts">
-                <button onclick="runCmd('/explain')">Explain Code</button>
-                <button onclick="runCmd('/fix')">Fix Bug</button>
-                <button onclick="runCmd('/generate')">Generate Code</button>
-                <button onclick="runCmd('/test')">Write Tests</button>
-                <button onclick="runCmd('/refactor')">Refactor</button>
-                <button onclick="agentMode()">🤖 Agent Mode</button>
-            </div>
-        </div>
-        <div id="messages"></div>
-        <div class="progress" id="progress" style="display:none">Working...</div>
-    </div>
-
-    <div class="cmd-menu" id="cmdMenu"></div>
-
-    <div class="input-wrap">
-        <textarea id="input" rows="1" placeholder="Type / for commands, describe a task, or ask anything..."></textarea>
-        <button class="send-btn" id="sendBtn" onclick="send()">Send</button>
-    </div>
-
+    <div class="input-w"><textarea id="input" rows="1" placeholder="Ask anything... (Enter to send)"></textarea><button id="snd" onclick="send()">Send</button></div>
     <script>
         var vscode = acquireVsCodeApi();
-        var content = document.getElementById('content');
-        var messages = document.getElementById('messages');
-        var input = document.getElementById('input');
-        var sendBtn = document.getElementById('sendBtn');
-        var progress = document.getElementById('progress');
-        var dash = document.getElementById('dash');
-        var cmdMenu = document.getElementById('cmdMenu');
-        var cmds = [
-            {cmd:'/explain',ico:'📖',dsc:'Explain code'},{cmd:'/fix',ico:'🔧',dsc:'Fix bug'},
-            {cmd:'/generate',ico:'⚡',dsc:'Generate code'},{cmd:'/test',ico:'🧪',dsc:'Write tests'},
-            {cmd:'/docs',ico:'📝',dsc:'Document code'},{cmd:'/refactor',ico:'♻️',dsc:'Refactor'},
-            {cmd:'/review',ico:'👀',dsc:'Review file'},{cmd:'/optimize',ico:'🚀',dsc:'Optimize'}
-        ];
-        var activeIdx = -1;
-
-        input.addEventListener('keydown',function(e){
-            if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(cmdMenu.style.display==='block'&&activeIdx>=0)pickCmd(cmds[activeIdx].cmd);else send();return}
-            if(e.key==='ArrowDown'){e.preventDefault();activeIdx=Math.min(activeIdx+1,cmds.length-1);renderMenu();return}
-            if(e.key==='ArrowUp'){e.preventDefault();activeIdx=Math.max(activeIdx-1,0);renderMenu();return}
-            if(e.key==='Escape'){cmdMenu.style.display='none';activeIdx=-1;return}
-            setTimeout(checkCmd,10);
-        });
-
-        function checkCmd(){var v=input.value,p=input.selectionStart,b=v.substring(0,p);var m=b.match(/\/(\w*)$/);if(m){var q=m[1].toLowerCase();var f=cmds.filter(function(c){return c.cmd.toLowerCase().includes('/'+q)});if(f.length>0){cmds=f;activeIdx=0;renderMenu()}else cmdMenu.style.display='none'}else{cmdMenu.style.display='none';activeIdx=-1}}
-        function renderMenu(){cmdMenu.innerHTML=cmds.map(function(c,i){return '<div class="cmd-item'+(i===activeIdx?' active':'')+'" onclick="pickCmd(\''+c.cmd+'\')"><span class="ico">'+c.ico+'</span><span class="cmd">'+c.cmd+'</span><span class="dsc">'+c.dsc+'</span></div>'}).join('');cmdMenu.style.display='block'}
-        function pickCmd(cmd){var v=input.value,p=input.selectionStart,b=v.substring(0,p);var i=b.lastIndexOf('/');input.value=b.substring(0,i)+cmd+' '+v.substring(p);cmdMenu.style.display='none';activeIdx=-1;input.focus()}
-        function runCmd(cmd){input.value=cmd+' ';send()}
-
-        function agentMode(){input.value='🤖 Agent: ';input.focus()}
-
-        function send(){
-            var text=input.value.trim();
-            if(!text)return;
-            if(dash)dash.style.display='none';
-            showUserMsg(text);
-            input.value='';sendBtn.disabled=true;progress.style.display='block';
-            vscode.postMessage({command:'sendMessage',text:text});
-        }
-
-        function showUserMsg(text){
-            var d=document.createElement('div');d.className='msg user';
-            d.innerHTML='<span class="q">'+esc(text)+'</span>';
-            messages.appendChild(d);content.scrollTop=content.scrollHeight;
-        }
-
-        window.addEventListener('message',function(e){
-            var m=e.data;
-            switch(m.command){
-                case 'addMessage':progress.style.display='none';sendBtn.disabled=false;input.focus();showResponse(m.text);break;
-                case 'addArtifact':progress.style.display='none';sendBtn.disabled=false;showArtifact(m.code,m.language,m.title);break;
-                case 'addPlan':progress.style.display='none';sendBtn.disabled=false;showPlan(m);break;
-                case 'responseError':progress.style.display='none';sendBtn.disabled=false;var er=document.createElement('div');er.className='msg error';er.textContent=m.error;messages.appendChild(er);break;
-                case 'updateStatus':document.getElementById('modelName').textContent=m.model||'?';document.getElementById('dot').className='dot '+(m.connected?'on':'off');break;
-            }
-        });
-
-        function showResponse(text){
-            var div=document.createElement('div');div.className='msg';
-            var hc=text.includes('```');
-            var h='';
-            if(hc){h+='<div class="sec-hdr">CODE ▼</div><div class="sec-body">'+text.replace(/```(\w*)\n?([\s\S]*?)```/g,function(_,lang,code){return '<div class="cb"><div class="cb-bar"><span>'+(lang||'text')+'</span><button onclick="cpy(this)">Copy</button></div><pre><code class="language-'+(lang||'text')+'">'+esc(code.trim())+'</code></pre></div>'})+'<div class="acts-row"><button class="pri" onclick="app(this)">Apply</button><button onclick="cpyCode(this)">Copy</button></div></div>'}
-            var ex=text.replace(/```[\s\S]*?```/g,'').replace(/\n{3,}/g,'\n\n').trim();
-            if(ex.length>30){h+='<div class="sec-hdr" onclick="tgl(this)">EXPLANATION '+(hc?'▶':'▼')+'</div><div class="sec-body'+(hc?' hidden':'')+'"><div class="text">'+fmt(ex)+'</div></div>'}
-            if(!hc&&ex.length<=30)h+='<div class="text">'+fmt(text)+'</div>';
-            var acts=hc?[{l:'Apply',p:1},{l:'Explain'},{l:'Add Tests'},{l:'Refactor'}]:[{l:'Continue'},{l:'Example'},{l:'More'}];
-            h+='<div class="acts-row">';acts.forEach(function(a){h+='<button class="'+(a.p?'pri':'')+'" onclick="ask(\''+a.l+'\')">'+a.l+'</button>'});h+='</div>';
-            div.innerHTML=h;messages.appendChild(div);content.scrollTop=content.scrollHeight;
-            div.querySelectorAll('pre code').forEach(function(b){hljs.highlightElement(b)});
-        }
-
-        function showArtifact(code,lang,title){
-            var div=document.createElement('div');div.className='msg';
-            div.innerHTML='<div class="sec-hdr">ARTIFACT: '+esc(title||'Code')+' <span style="opacity:.6;font-weight:400">'+(lang||'text')+'</span></div><div class="sec-body"><div class="cb"><div class="cb-bar"><span>'+(lang||'text')+'</span><button onclick="cpy(this)">Copy</button></div><pre><code class="language-'+(lang||'text')+'">'+esc(code)+'</code></pre></div><div class="acts-row"><button class="pri" onclick="app(this)">Apply</button><button onclick="ask(\'Explain\')">Explain</button><button onclick="ask(\'Add Tests\')">Add Tests</button></div></div>';
-            messages.appendChild(div);content.scrollTop=content.scrollHeight;
-            div.querySelectorAll('pre code').forEach(function(b){hljs.highlightElement(b)});
-        }
-
-        function showPlan(data){
-            var div=document.createElement('div');div.className='msg';
-            var h='<div class="sec-hdr">📋 PLAN: '+esc(data.goal||'Task')+'</div><div class="sec-body">';
-            h+='<div style="margin-bottom:8px;font-size:12px;color:var(--vscode-descriptionForeground,#999)">'+esc(data.summary||'')+' | Risk: <b>'+(data.risk_level||'medium').toUpperCase()+'</b> | Steps: '+(data.estimated_steps||0)+'</div>';
-            if(data.steps){data.steps.forEach(function(s){h+='<div class="step"><span class="icon">'+({'create':'➕','modify':'✏️','delete':'🗑️','test':'🧪','run':'▶️'}[s.action]||'📝')+'</span><span>'+esc(s.description)+'</span><span style="font-size:10px;color:var(--vscode-descriptionForeground,#999);margin-left:auto">'+esc(s.file||'')+'</span></div>'});}
-            h+='<div class="acts-row" style="margin-top:8px"><button class="pri" onclick="ask(\'Execute plan\')">Execute</button><button onclick="ask(\'Modify plan\')">Modify</button><button class="danger" onclick="ask(\'Cancel\')">Cancel</button></div>';
-            h+='</div>';div.innerHTML=h;messages.appendChild(div);content.scrollTop=content.scrollHeight;
-        }
-
-        function tgl(h){var b=h.nextElementSibling;b.classList.toggle('hidden');h.textContent=h.textContent.replace(/[▼▶]/,'')+(b.classList.contains('hidden')?'▶':'▼')}
-        function app(b){vscode.postMessage({command:'applyCode',text:b.closest('.msg').querySelector('code').textContent})}
-        function cpy(b){navigator.clipboard.writeText(b.closest('.cb').querySelector('code').textContent);b.textContent='Copied!';setTimeout(function(){b.textContent='Copy'},1500)}
-        function cpyCode(b){navigator.clipboard.writeText(b.closest('.msg').querySelector('code').textContent);b.textContent='Copied!';setTimeout(function(){b.textContent='Copy'},1500)}
+        var msgs = document.getElementById('msgs'), input = document.getElementById('input'), snd = document.getElementById('snd'), empty = document.getElementById('empty');
+        input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
         function ask(t){input.value=t;send()}
-        function fmt(t){return t.replace(/`([^`]+)`/g,'<code style="background:var(--vscode-textCodeBlock-background,#1a1a1a);padding:1px 5px;border-radius:3px">$1</code>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}
+        function send(){var t=input.value.trim();if(!t)return;if(empty)empty.remove();show(t,'user');input.value='';snd.disabled=true;vscode.postMessage({command:'sendMessage',text:t})}
+        function show(text,type){var d=document.createElement('div');d.className='msg '+(type||'ai');
+            if(type==='user')d.innerHTML='<div class="lbl">You</div>'+esc(text);
+            else if(type==='error')d.innerHTML='<div class="lbl" style="color:#f85149">Error</div><span style="color:#f99">'+esc(text)+'</span>';
+            else{var h='<div class="lbl">CodeForge</div>'+md(text);if(text.includes('```'))h+='<div class="acts"><button class="pri" onclick="app(this)">Apply</button><button onclick="cpy(this)">Copy</button><button onclick="ask(\'Explain\')">Explain</button></div>';else h+='<div class="acts"><button onclick="ask(\'Continue\')">Continue</button><button onclick="ask(\'Example\')">Example</button></div>';d.innerHTML=h}
+            msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;d.querySelectorAll('pre code').forEach(function(b){hljs.highlightElement(b)})
+        }
+        function md(t){return t.replace(/```(\w*)\n?([\s\S]*?)```/g,function(_,l,c){return'<div class="cb"><div class="cb-top"><span>'+(l||'text')+'</span><button onclick="c2(this)">Copy</button></div><pre><code class="language-'+(l||'text')+'">'+esc(c.trim())+'</code></pre></div>'}).replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code style="background:var(--vscode-textCodeBlock-background,#0d1117);padding:1px 4px;border-radius:2px;font-size:11px">$1</code>')}
+        function app(b){var c=b.closest('.msg').querySelector('code').textContent;vscode.postMessage({command:'applyCode',text:c});vscode.window?.showInformationMessage?.('Applied!')}
+        function cpy(b){var c=b.closest('.msg').querySelector('code').textContent;navigator.clipboard.writeText(c);b.textContent='Copied!';setTimeout(function(){b.textContent='Copy'},1500)}
+        function c2(b){var c=b.closest('.cb').querySelector('code').textContent;navigator.clipboard.writeText(c);b.textContent='Copied!';setTimeout(function(){b.textContent='Copy'},1500)}
         function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+        window.addEventListener('message',function(e){var m=e.data;snd.disabled=false;input.focus();if(m.command==='addMessage')show(m.text,m.type);if(m.command==='addArtifact')show('```'+(m.language||'')+'\n'+m.code+'\n```','ai');if(m.command==='responseError')show(m.error,'error')});
     </script>
 </body>
 </html>

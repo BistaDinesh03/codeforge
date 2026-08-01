@@ -56,3 +56,6 @@ async def startup():
 async def shutdown():
     get_discovery_service().stop()
     logger.info("Server shutting down")
+
+
+    
