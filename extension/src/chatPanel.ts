@@ -19,10 +19,13 @@ export class ChatPanel {
   }
 
   public static init(context: vscode.ExtensionContext): void {}
+
   public static createOrShow(extUri: vscode.Uri, apiClient: ApiClient, statusBar: StatusBarManager, context?: vscode.ExtensionContext): void {
     if (ChatPanel.currentPanel) { ChatPanel.currentPanel.panel.reveal(vscode.ViewColumn.Two); return; }
-    ChatPanel.currentPanel = new ChatPanel(new vscode.window.createWebviewPanel("codeforgeChat","CodeForge",vscode.ViewColumn.Two,{enableScripts:true,retainContextWhenHidden:true}), extUri, apiClient, statusBar);
+    const panel = vscode.window.createWebviewPanel("codeforgeChat", "CodeForge", vscode.ViewColumn.Two, { enableScripts: true, retainContextWhenHidden: true });
+    ChatPanel.currentPanel = new ChatPanel(panel, extUri, apiClient, statusBar);
   }
+
   public static addMessage(text: string, type: "user" | "ai" | "error"): void {
     ChatPanel.currentPanel?.panel.webview.postMessage({ command: "addMessage", text, type });
   }
@@ -41,13 +44,19 @@ export class ChatPanel {
     try {
       const r = await this.apiClient.chat(text);
       const m = r.response.match(/```(\w*)\n?([\s\S]*?)```/);
-      if (m) this.panel.webview.postMessage({ command: "addArtifact", code: m[2].trim(), language: m[1]||"text" });
+      if (m) this.panel.webview.postMessage({ command: "addArtifact", code: m[2].trim(), language: m[1] || "text" });
       else this.panel.webview.postMessage({ command: "addMessage", text: r.response, type: "ai" });
     } catch (error) {
       this.panel.webview.postMessage({ command: "addMessage", text: error instanceof Error ? error.message : "Failed", type: "error" });
     }
   }
 
-  private getHtml(extUri: vscode.Uri): string { return fs.readFileSync(path.join(extUri.fsPath, "src", "chat.html"), "utf-8"); }
-  private dispose(): void { ChatPanel.currentPanel = undefined; this.panel.dispose(); while (this.disposables.length) { const d = this.disposables.pop(); if (d) d.dispose(); } }
+  private getHtml(extUri: vscode.Uri): string {
+    return fs.readFileSync(path.join(extUri.fsPath, "src", "chat.html"), "utf-8");
+  }
+
+  private dispose(): void {
+    ChatPanel.currentPanel = undefined; this.panel.dispose();
+    while (this.disposables.length) { const d = this.disposables.pop(); if (d) d.dispose(); }
+  }
 }
