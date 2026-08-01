@@ -20,8 +20,8 @@ from app.api.agent import router as agent_router
 from app.api.tools_api import router as tools_router
 from app.api.review_api import router as review_router
 from app.api.memory_api import router as memory_router
+from app.api.safety_api import router as safety_router
 from app.services.discovery import get_discovery_service
-from app.services.updater import check_for_updates
 
 setup_logging()
 logger = get_logger(__name__)
@@ -42,6 +42,7 @@ app.include_router(agent_router)
 app.include_router(tools_router)
 app.include_router(review_router)
 app.include_router(memory_router)
+app.include_router(safety_router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
