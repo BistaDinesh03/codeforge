@@ -16,6 +16,7 @@ from app.api.completion import router as completion_router
 from app.api.update import router as update_router
 from app.api.download import router as download_router
 from app.api.workspace import router as workspace_router
+from app.api.agent import router as agent_router
 from app.services.discovery import get_discovery_service
 from app.services.updater import check_for_updates
 
@@ -40,24 +41,18 @@ app.include_router(completion_router)
 app.include_router(update_router)
 app.include_router(download_router)
 app.include_router(workspace_router)
+app.include_router(agent_router)
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error_code": "INTERNAL_ERROR"},
-    )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/")
 async def root():
-    return {
-        "name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "running",
-    }
+    return {"name": settings.APP_NAME, "version": settings.APP_VERSION, "status": "running"}
 
 
 @app.on_event("startup")
