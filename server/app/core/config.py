@@ -1,5 +1,5 @@
 """
-Central configuration for CodeForge server.
+Central configuration for CodeTalk server.
 Reads from environment variables, .env file, and defaults.
 """
 
@@ -9,40 +9,27 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """All configuration for CodeForge server."""
+    """All configuration for CodeTalk server."""
 
-    # ── Application ──
-    APP_NAME: str = "CodeForge Server"
-    APP_VERSION: str = "0.1.0"
-    ENVIRONMENT: str = "development"  # development, staging, production
+    APP_NAME: str = "CodeTalk"
+    APP_VERSION: str = "1.0.0"
+    ENVIRONMENT: str = "development"
     DEBUG: bool = False
 
-    # ── Server ──
-    HOST: str = "0.0.0.0"  # Accept connections from any device on network
+    HOST: str = "0.0.0.0"
     PORT: int = 8000
-    WORKERS: int = 1  # Single worker for model inference (CPU-bound)
+    WORKERS: int = 1
 
-    # ── Paths ──
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     MODELS_DIR: Path = BASE_DIR / "models"
     LOGS_DIR: Path = BASE_DIR / "logs"
 
-    # ── Model defaults ──
-    DEFAULT_MODEL: str = ""  # Auto-detect if empty
-    MAX_TOKENS: int = 2048
-    TEMPERATURE: float = 0.7
-    CONTEXT_LENGTH: int = 4096
-
-    # ── Logging ──
-    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
-
-    # ── Security ──
-    API_KEY: str = ""  # Empty = no authentication required
+    LOG_LEVEL: str = "INFO"
+    API_KEY: str = ""
     ALLOWED_ORIGINS: list[str] = ["*"]
 
-    # ── Performance ──
-    REQUEST_TIMEOUT: int = 120  # Seconds before request times out
-    MAX_REQUEST_SIZE: int = 100_000  # Max chat message size in characters
+    REQUEST_TIMEOUT: int = 120
+    MAX_REQUEST_SIZE: int = 100_000
 
     class Config:
         env_file = ".env"
@@ -50,16 +37,12 @@ class Settings(BaseSettings):
         case_sensitive = True
 
     def model_dump_safe(self) -> dict:
-        """Return settings as dict, hiding API key if set."""
         data = self.model_dump()
         if data.get("API_KEY"):
             data["API_KEY"] = "***"
         return data
 
 
-# Create global settings instance
 settings = Settings()
-
-# Ensure directories exist
 settings.MODELS_DIR.mkdir(parents=True, exist_ok=True)
 settings.LOGS_DIR.mkdir(parents=True, exist_ok=True)

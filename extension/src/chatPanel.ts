@@ -31,11 +31,23 @@ export class ChatPanel {
   }
 
   private async handle(msg: { command: string; text?: string }): Promise<void> {
-    if (msg.command === "sendMessage" && msg.text) await this.sendMessage(msg.text);
+    if (msg.command === "sendMessage" && msg.text) {
+      await this.sendMessage(msg.text);
+    }
     if (msg.command === "applyCode" && msg.text) {
       const editor = vscode.window.activeTextEditor;
-      if (editor) await editor.edit(e => editor.selection.isEmpty ? e.insert(editor.selection.active, msg.text!) : e.replace(editor.selection, msg.text!));
-      else vscode.window.showWarningMessage("Open a file first to apply code.");
+      if (!editor) {
+        vscode.window.showWarningMessage("Open a file first, then click Apply.");
+        return;
+      }
+      await editor.edit(e => {
+        if (editor.selection.isEmpty) {
+          e.insert(editor.selection.active, msg.text!);
+        } else {
+          e.replace(editor.selection, msg.text!);
+        }
+      });
+      vscode.window.showInformationMessage("Code applied!");
     }
   }
 
@@ -44,8 +56,11 @@ export class ChatPanel {
     try {
       const r = await this.apiClient.chat(text);
       const m = r.response.match(/```(\w*)\n?([\s\S]*?)```/);
-      if (m) this.panel.webview.postMessage({ command: "addArtifact", code: m[2].trim(), language: m[1] || "text" });
-      else this.panel.webview.postMessage({ command: "addMessage", text: r.response, type: "ai" });
+      if (m) {
+        this.panel.webview.postMessage({ command: "addArtifact", code: m[2].trim(), language: m[1] || "text" });
+      } else {
+        this.panel.webview.postMessage({ command: "addMessage", text: r.response, type: "ai" });
+      }
     } catch (error) {
       this.panel.webview.postMessage({ command: "addMessage", text: error instanceof Error ? error.message : "Failed", type: "error" });
     }

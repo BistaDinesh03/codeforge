@@ -30,3 +30,7 @@ async def root():
 @app.on_event("startup")
 async def startup():
     logger.info("CodeTalk server started")
+
+@app.on_event("shutdown")
+async def shutdown():
+    logger.info("CodeTalk server shutting down")
